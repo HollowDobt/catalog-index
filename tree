@@ -1,0 +1,51 @@
+knowledge_index_system/
+├── src/
+│   ├── domain/                           # 核心业务逻辑
+│   │   ├── __init__.py
+│   │   ├── entities.py                   # 核心实体定义
+│   │   ├── knowledge_extractor.py        # 知识提取核心逻辑
+│   │   ├── graph_builder.py              # 图构建逻辑
+│   │   └── semantic_processor.py         # 语义处理逻辑
+│   │
+│   ├── infrastructure/                   # 外部系统集成
+│   │   ├── __init__.py
+│   │   ├── deepseek_client.py           # DeepSeek API客户端
+│   │   ├── mem0_client.py               # Mem0图数据库客户端
+│   │   ├── document_parsers.py          # 文档解析器集合
+│   │   └── config.py                    # 配置管理
+│   │
+│   ├── application/                      # 应用服务层
+│   │   ├── __init__.py
+│   │   ├── document_processor.py        # 文档处理服务
+│   │   ├── knowledge_service.py         # 知识管理服务
+│   │   └── search_service.py            # 搜索服务
+│   │
+│   ├── interfaces/                       # 用户接口
+│   │   ├── __init__.py
+│   │   ├── api.py                       # REST API接口
+│   │   └── cli.py                       # 命令行接口
+│   │
+│   └── utils/                           # 通用工具
+│       ├── __init__.py
+│       ├── text_processing.py           # 文本处理工具
+│       ├── validators.py                # 数据验证工具
+│       └── exceptions.py                # 异常定义
+│
+├── tests/
+│   ├── __init__.py
+│   ├── test_domain.py                   # 领域逻辑测试
+│   ├── test_infrastructure.py           # 基础设施测试
+│   ├── test_application.py              # 应用服务测试
+│   └── fixtures/                        # 测试数据
+│       ├── sample_documents/
+│       └── mock_responses/
+│
+├── config/
+│   ├── development.yaml                 # 开发环境配置
+│   ├── production.yaml                  # 生产环境配置
+│   └── api_keys.yaml.example           # API密钥模板
+│
+├── requirements.txt                     # 项目依赖
+├── .env.example                         # 环境变量示例
+├── README.md
+└── main.py                             # 程序入口
