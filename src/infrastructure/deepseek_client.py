@@ -63,10 +63,6 @@ class DeepSeekClient:
     timeout: int = 100
     
     _headers: Dict[str, str] = field(default_factory=dict, init=False)
-    _PING_MESSAGES: List[Dict[str, str]] = [
-        {"role": "system", "content": "You are a ping agent."},
-        {"role": "user", "content": "ping"},
-    ]
     
     # Public: Chat Completion.
     # "**kwargs: Any" allows other parameters to be passed directly to the model
@@ -133,7 +129,7 @@ class DeepSeekClient:
         """
         try:
             result = self.chat_completion(
-                self._PING_MESSAGES,
+                config.PING_MESSAGES,
                 model=config.DEFAULT_MODEL,
                 temperature=0.0,
                 max_token=1,
@@ -141,10 +137,34 @@ class DeepSeekClient:
             )
             _ = result["choices"][0]["message"]["content"] # noqa: B018
         except Exception as exc:  # pylint: disable=broad-except
+            
             # TODO: 接入 logging 组件替换 print
+            
             print(f"[DeepSeek] Initialize Error: {exc}")
             raise DeepSeekConnectionError(
                 "Deepseek url or qri is incorrect"
             ) from exc
             
 
+### -------------------------------------------------------
+### USE FOR TEST
+### -------------------------------------------------------
+
+# if __name__ == "__main__":
+#     import os
+#     from dotenv import load_dotenv
+#     load_dotenv()
+
+#     client = DeepSeekClient(
+#         base_url=os.getenv("DEEPSEEK_BASE_URL", "https://api.deepseek.com"),
+#         api_key=os.getenv("DEEPSEEK_API_KEY", ""),
+#     )
+#     reply = client.chat_completion(
+#         [
+#             {"role": "system", "content": "You are a helpful assistant."},
+#             {"role": "user", "content": "hello"},
+#         ],
+#         temperature=0.2,
+#         max_tokens=10,
+#     )
+#     print("[DeepSeek] hello ->", reply["choices"][0]["message"]["content"])
