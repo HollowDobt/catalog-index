@@ -1,25 +1,24 @@
 # ───────── Core SDKs ─────────
 requests>=2.32.0,<3.0
-openai>=1.33.0,<2.0            # 深度兼容 DeepSeek API（OpenAI‑style）
-mem0ai[graph]>=0.10.1,<0.11    # mem0 SDK + Neo4j 支持
-neo4j>=5.20.0,<6.0             # 仅当使用 OSS Neo4j 或 Aura
+openai>=1.33.0,<2.0
+mem0ai[graph]>=0.1.0,<0.2.0
+neo4j>=5.20.0,<6.0
 
 # ───────── NLP / 解析 ─────────
-spacy>=3.7.3,<3.10
-en-core-web-sm==3.7.0          # spaCy 英文模型（下载见脚本）
+spacy>=3.7.0,<3.10
 python-docx>=1.1.0,<1.2
-pylatexenc>=3.0.0,<3.1
-tiktoken>=0.7.0,<0.8           # token 计数（可选）
+pylatexenc>=3.0a13,<4.0       # 支持 3.0a13–3.0a32 等预发布版本
+tiktoken>=0.7.0,<0.8
 pyyaml>=6.0.0,<7.0
 
 # ───────── Web / API ─────────
 fastapi>=0.111.0,<1.0
 uvicorn[standard]>=0.30.0,<1.0
-typer[all]>=0.12.3,<1.0        # CLI
+typer>=0.12.3,<1.0
 
 # ───────── Utilities ─────────
 python-dotenv>=1.0.1,<2.0
-pydantic>=2.8.0,<3.0           # 数据验证
+pydantic>=2.8.0,<3.0
 tqdm>=4.66.4,<5.0
 
 # ───────── Testing ─────────
