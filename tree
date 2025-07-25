@@ -8,11 +8,11 @@ knowledge_index_system/
 │   │   └── semantic_processor.py         # 语义处理逻辑
 │   │
 │   ├── infrastructure/                   # 外部系统集成
-│   │   ├── __init__.py
-│   │   ├── deepseek_client.py           # DeepSeek API客户端
-│   │   ├── mem0_client.py               # Mem0图数据库客户端
+│   │   ├── __init__.py                  V
+│   │   ├── deepseek_client.py           V  # DeepSeek API客户端
+│   │   ├── mem0_client.py               V  # Mem0图数据库客户端
 │   │   ├── document_parsers.py          # 文档解析器集合
-│   │   └── config.py                    # 配置管理
+│   │   └── config.py                    V  # 配置管理
 │   │
 │   ├── application/                      # 应用服务层
 │   │   ├── __init__.py

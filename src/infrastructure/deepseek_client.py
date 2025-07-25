@@ -3,16 +3,16 @@
 src/infrastructure/deepseek_client.py
 -------------------------------------
 
-# In order to ensure compatibility and access scalability to the greatest extent, 
-# the OpenAI library is not used here, but this class is written separately.
-
 # Simple encapsulation of requests to deepseek servers, 
 # implemented as DeepSeekClient class.
 
-# Each time the DeepSeekClient class is instantiated, 
+# WARN 1: Each time the DeepSeekClient class is instantiated, 
 # it will first send a request to the determined server address 
 # using the corresponding API to test whether it works properly. 
 # If the test fails, the error type is returned and output to the log.
+
+# WARN 2: Leaving a "/" at the end of base_url is allowed,
+# both "https://api.deepseek.com" and "https://api.deepseek.com/" are OK.
 """
 
 from __future__ import annotations
@@ -21,12 +21,13 @@ from typing import List, Dict, Any, Optional
 import json
 import uuid
 import requests
+
 import config
+
 
 ### -------------------------------------------------------
 ### Exception class definition
 ### -------------------------------------------------------
-
 
 class DeepSeekConnectionError(RuntimeError):
     """
@@ -39,6 +40,7 @@ class DeepSeekAPIError(RuntimeError):
     A non-2xx error code is returned when calling the DeepSeek API.
     Further analysis is required based on the error code.
     """
+
 
 ### -------------------------------------------------------
 ### DeepSeek API Wrapper
@@ -150,21 +152,21 @@ class DeepSeekClient:
 ### USE FOR TEST
 ### -------------------------------------------------------
 
-# if __name__ == "__main__":
-#     import os
-#     from dotenv import load_dotenv
-#     load_dotenv()
+if __name__ == "__main__":
+    import os
+    from dotenv import load_dotenv
+    load_dotenv()
 
-#     client = DeepSeekClient(
-#         base_url=os.getenv("DEEPSEEK_BASE_URL", "https://api.deepseek.com"),
-#         api_key=os.getenv("DEEPSEEK_API_KEY", ""),
-#     )
-#     reply = client.chat_completion(
-#         [
-#             {"role": "system", "content": "You are a helpful assistant."},
-#             {"role": "user", "content": "hello"},
-#         ],
-#         temperature=0.2,
-#         max_tokens=10,
-#     )
-#     print("[DeepSeek] hello ->", reply["choices"][0]["message"]["content"])
+    client = DeepSeekClient(
+        base_url=os.getenv("DEEPSEEK_BASE_URL", "https://api.deepseek.com"),
+        api_key=os.getenv("DEEPSEEK_API_KEY", ""),
+    )
+    reply = client.chat_completion(
+        [
+            {"role": "system", "content": "You are a helpful assistant."},
+            {"role": "user", "content": "hello"},
+        ],
+        temperature=0.2,
+        max_tokens=10,
+    )
+    print("[DeepSeek] hello ->", reply["choices"][0]["message"]["content"])

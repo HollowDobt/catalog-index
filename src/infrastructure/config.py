@@ -7,6 +7,7 @@ src/infrastructure/config.py
 """
 from typing import List, Dict
 
+
 DEFAULT_MODEL = "deepseek-chat"
 DEFAULT_CHAT_PATH = "/v1/chat/completions"
 PING_MESSAGES: List[Dict[str, str]] = [
