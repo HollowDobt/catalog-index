@@ -1,94 +1,68 @@
-"""
-src/infrastructure/document_parsers.py
-======================================
-流式解析科研 **DOCX** / **LaTeX** 文档 → 术语-定义对 (用于 mem0 图写入)
-
-依赖:
-    python-docx    (可选, 仅用于获取文档属性)
-    lxml
-    pylatexenc
-    tqdm
-"""
+"""Utility to stream-parse **DOCX** / **LaTeX** files into structured terms."""
 
 from __future__ import annotations
 
-import hashlib                # 计算 SHA-256
-import json                   # 解析 LLM JSON 返回
+import hashlib  # compute SHA-256
+import json  # decode LLM JSON
 import logging
 import os
-import re                     # 如需正则
-import textwrap               # 控制终端输出宽度
-import zipfile                # 解压 .docx
+import re  # regular expressions
+import textwrap  # console output width
+import zipfile  # unzip .docx
 from dataclasses import dataclass, field
-from pathlib import Path      # 路径处理
-from typing import Dict, Generator, List, Any
+from pathlib import Path  # path utils
+from typing import Dict, Generator, List, Any, Set, Protocol
 
-from dotenv import load_dotenv          # 读取 .env
-from lxml import etree                  # 流式 XML
-from tqdm import tqdm                   # 进度条
+from dotenv import load_dotenv  # load .env for CLI
+from xml.etree import ElementTree as ET  # standard streaming XML
+from tqdm import tqdm  # progress bar
 from pylatexenc.latex2text import LatexNodes2Text  # LaTeX→text
 
-# 本项目内部依赖
+# internal deps
 from deepseek_client import DeepSeekClient, DeepSeekAPIError
+from mem0_client import Mem0Client
 
-# -------------------- 常量与日志 --------------------
+
+class LLMProtocol(Protocol):
+    """Minimal chat completion interface required by the parser."""
+
+    def chat_completion(self, *args: Any, **kwargs: Any) -> Dict[str, Any]:
+        ...
+
+# constants and logging
 NS = {"w": "http://schemas.openxmlformats.org/wordprocessingml/2006/main"}
 logger = logging.getLogger(__name__)
 
-# -------------------- 工具函数 --------------------
+# helper utilities
 
 
 def _sha256(data: str | bytes) -> str:
-    """返回 *data* 的 SHA-256 十六进制摘要"""
+    """Return the SHA-256 hex digest of *data*."""
     if isinstance(data, str):
         data = data.encode()
     return hashlib.sha256(data).hexdigest()
 
 
-def _chunk_text(text: str, max_chars: int = 8000, overlap: int = 250) -> List[str]:
-    """
-    将长文本切成重叠字符块, 防止切断定义
-    """
-    pieces: List[str] = []
-    p = 0
-    n = len(text)
-    while p < n:
-        end = min(p + max_chars, n)
-        pieces.append(text[p:end])
-        p = end - overlap
-        if p < 0:
-            p = 0
-    return pieces
-
-
-# -------------------- 主解析类 --------------------
+# -------------------- Main parser --------------------
 
 
 @dataclass
 class DocumentParser:
-    """
-    逐段流式解析文件 → term-definition 列表
-    """
+    """Stream-parse documents into term-definition segments."""
 
-    llm: DeepSeekClient                          # DeepSeek 客户端
-    max_chars: int = 8_000                       # 每块最多字符
-    llm_model: str = field(default="deepseek-chat")  # 使用模型
+    llm: LLMProtocol
+    max_chars: int = 8_000
+    llm_model: str = field(default="deepseek-chat")
 
-    # —— 公共 API ————————————————————————
+    # public API
 
     def parse_file(self, file_path: str | Path) -> Dict[str, Any]:
-        """
-        流式解析 *file_path* 并返回:
-            {
-              "terms": [{"term":..,"definition":..}, ...],
-              "metadata": {...}
-            }
-        """
+        """Parse *file_path* and return extracted segments and metadata."""
         file_path = Path(file_path).resolve()
         if not file_path.exists():
             raise FileNotFoundError(file_path)
 
-        # 选择流式迭代器
+        # choose iterator based on extension
         ext = file_path.suffix.lower()
         if ext == ".docx":
             para_iter = self._iter_docx(file_path)
@@ -97,55 +71,73 @@ class DocumentParser:
         else:
             raise ValueError(f"Unsupported extension: {ext}")
 
-        # 收集术语（用 dict 去重）
-        terms: Dict[str, str] = {}
-        total_chars = 0
-        chunk: List[str] = []
+        # collect terms using a dict to deduplicate
+        _terms: Dict[str, Dict[str, Any]] = {}
+        _total_chars = 0
+        _chunk: List[str] = []
+        _start_para = 1
+        _para_idx = 0
 
         for para in para_iter:
-            total_chars += len(para) + 1
-            chunk.append(para)
+            _para_idx += 1
+            _total_chars += len(para) + 1
+            _chunk.append(para)
 
-            # 达到 3 段或累积字符超限即发送 LLM
-            if len(chunk) >= 3 or sum(len(p) for p in chunk) > self.max_chars:
-                self._update_terms_from_chunk("\n".join(chunk), terms)
-                chunk.clear()
+            # send chunk to LLM every 3 paragraphs or when too long
+            if len(_chunk) >= 3 or sum(len(p) for p in _chunk) > self.max_chars:
+                self._update_terms_from_chunk("\n".join(_chunk), _terms, _start_para, _para_idx)
+                _chunk.clear()
+                _start_para = _para_idx + 1
 
-        # 处理结尾残余
-        if chunk:
-            self._update_terms_from_chunk("\n".join(chunk), terms)
+        # handle final chunk
+        if _chunk:
+            self._update_terms_from_chunk("\n".join(_chunk), _terms, _start_para, _para_idx)
+
+        segments = []
+        for term, info in _terms.items():
+            segments.append(
+                {
+                    "term": term,
+                    "synonyms": sorted(info["synonyms"]),
+                    "definition": info["definition"],
+                    "source": {"filename": file_path.name, "paragraphs": info["occurrences"]},
+                }
+            )
 
         return {
-            "terms": [{"term": k, "definition": v} for k, v in terms.items()],
+            "segments": segments,
             "metadata": {
                 "filename": file_path.name,
-                "chars": total_chars,
-                "sha256": _sha256(str(file_path) + str(total_chars)),
+                "chars": _total_chars,
+                "sha256": _sha256(str(file_path) + str(_total_chars)),
             },
         }
 
-    # —— 私有：段落迭代器 ————————————————————
+
+
+    # internal: paragraph generators
 
     def _iter_docx(self, path: Path) -> Generator[str, None, None]:
-        """
-        流式读取 .docx: 使用 lxml.iterparse 逐 <w:p> 段
-        """
+        """Yield paragraph texts from a .docx file via streaming XML."""
+        p_tag = f"{{{NS['w']}}}p"
+        t_tag = f"{{{NS['w']}}}t"
+        buffer: List[str] = []
         with zipfile.ZipFile(path) as zf:
             with zf.open("word/document.xml") as xml:
-                context = etree.iterparse(xml, events=("end",), tag="{%s}p" % NS["w"])
-                for _, elem in context:
-                    texts = [t.text for t in elem.iter("{%s}t" % NS["w"]) if t.text]
-                    if texts:
-                        yield "".join(texts).strip()
-                    # 释放内存
-                    elem.clear()
-                    while elem.getprevious() is not None:
-                        del elem.getparent()[0]
+                for event, elem in ET.iterparse(xml, events=("start", "end")):
+                    if event == "start" and elem.tag == p_tag:
+                        buffer.clear()
+                    elif event == "end" and elem.tag == t_tag:
+                        if elem.text:
+                            buffer.append(elem.text)
+                    elif event == "end" and elem.tag == p_tag:
+                        paragraph = "".join(buffer).strip()
+                        if paragraph:
+                            yield paragraph
+                        elem.clear()
 
     def _iter_tex(self, path: Path) -> Generator[str, None, None]:
-        """
-        流式读取 .tex: 以空行作为段分隔
-        """
+        """Yield paragraphs from a .tex file separated by blank lines."""
         conv = LatexNodes2Text()
         buf: List[str] = []
         with path.open("r", encoding="utf-8", errors="ignore") as fp:
@@ -159,14 +151,16 @@ class DocumentParser:
         if buf:
             yield conv.latex_to_text(" ".join(buf))
 
-    # —— 私有：LLM 调用 & 结果合并 ————————————
+    # internal: call LLM and merge results
 
-    def _update_terms_from_chunk(self, text: str, out: Dict[str, str]) -> None:
-        """
-        调 LLM 抽术语；若解析失败，尝试 fallback:
-          1. 捕获 ```json ...``` 代码块再 json.loads
-          2. 仍失败则记录 warning 并返回
-        """
+    def _update_terms_from_chunk(
+        self,
+        text: str,
+        out: Dict[str, Dict[str, Any]],
+        para_start: int,
+        para_end: int,
+    ) -> None:
+        """Update *out* with terms extracted from the text chunk via LLM."""
         if not text.strip():
             return
 
@@ -177,19 +171,23 @@ class DocumentParser:
             for item in data:
                 term = item.get("term", "").strip()
                 defi = item.get("definition", "").strip()
-                if term and defi and (term not in out or len(defi) > len(out[term])):
-                    out[term] = defi
+                syns = [s.strip() for s in item.get("synonyms", []) if isinstance(s, str) and s.strip()]
+                if not term:
+                    continue
+                info = out.setdefault(term, {"definition": "", "synonyms": set(), "occurrences": []})
+                if defi and len(defi) > len(info["definition"]):
+                    info["definition"] = defi
+                info["synonyms"].update(syns)
+                info["occurrences"].append({"start": para_start, "end": para_end})
         except DeepSeekAPIError as exc:
             logger.warning("LLM API error: %s", exc)
-        except ValueError as exc:  # JSON 解析失败
+        except ValueError as exc:  # JSON decode error
             logger.warning("LLM extraction fail: %s • Raw: %s", exc, raw[:120])
 
-    # ---------- 新增: 安全 JSON 加载 ----------
+    # safe JSON loading helper
     @staticmethod
     def _safe_load_json(raw: str) -> List[Dict]:
-        """
-        尝试 json.loads(raw)；若失败则在 ```json``` 代码块中提取
-        """
+        """Safely load a JSON list from raw LLM output."""
         import json, re
         try:
             obj = json.loads(raw)
@@ -202,16 +200,12 @@ class DocumentParser:
 
 
     def _call_llm(self, text: str) -> str:
-        """
-        请求 DeepSeek，并尽量让模型输出【纯 JSON】：
-          • system 指示“仅输出 JSON 数组”
-          • response_format={"type":"json_object"} 表达硬约束（DeepSeek 支持）
-        返回 assistant content（str）
-        """
+        """Call the LLM to extract terms, expecting strictly JSON output."""
         sys_msg = (
-            "你是科研助手，只做术语抽取。\n"
-            "输出严格的 JSON 数组，每项包含 term 和 definition 两个键。\n"
-            "除 JSON 外不要输出任何多余文字。"
+            "You are a research assistant. Extract terms only.\n"
+            "Return a strict JSON array with keys term, synonyms and definition.\n"
+            "synonyms should be a string array and may be empty.\n"
+            "Return nothing except JSON."
         )
         rsp = self.llm.chat_completion(
             messages=[
@@ -227,42 +221,63 @@ class DocumentParser:
         return rsp["choices"][0]["message"]["content"]
 
 
+class PaperParser(DocumentParser):
+    """Parse papers and persist segments to mem0."""
 
-# -------------------- CLI 测试入口 --------------------
+    def __init__(self, llm: LLMProtocol, mem0: Mem0Client, max_chars: int = 8_000, llm_model: str = "deepseek-chat") -> None:
+        super().__init__(llm=llm, max_chars=max_chars, llm_model=llm_model)
+        self.mem0 = mem0
+
+    def parse_and_store(self, file_path: str | Path, *, user_id: str = "paper_parser") -> List[str]:
+        """Parse the document and write segments to mem0."""
+        result = self.parse_file(file_path)
+        ids: List[str] = []
+        for seg in result["segments"]:
+            meta = {
+                "term": seg["term"],
+                "synonyms": seg["synonyms"],
+                **seg["source"],
+            }
+            try:
+                rsp = self.mem0.add_memory(seg["definition"], metadata=meta, user_id=user_id)
+                if isinstance(rsp, dict) and "id" in rsp:
+                    ids.append(rsp["id"])
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("mem0 add failed: %s", exc)
+        return ids
+
+
+
+# -------------------- CLI test entry --------------------
 
 if __name__ == "__main__":  # pragma: no cover
-    """
-    用法:
-        python document_parsers.py [file]
-
-    若省略文件参数，默认为 tests/sample_documents/sample.docx
-    """
+    """CLI helper for manual testing."""
 
     import argparse
-    from rich import print  # 彩色终端
+    from rich import print  # colorful output
 
-    # 1) 加载环境变量
+    # 1) load environment
     load_dotenv()
-    key = os.getenv("DEEPSEEK_API_KEY") or exit("缺少 DEEPSEEK_API_KEY")
+    key = os.getenv("DEEPSEEK_API_KEY") or exit("Missing DEEPSEEK_API_KEY")
 
-    # 2) 解析命令行
+    # 2) parse command
     parser = argparse.ArgumentParser()
-    parser.add_argument("file", nargs="?", help="待解析文件(.docx/.tex)")
+    parser.add_argument("file", nargs="?", help="File to parse (.docx/.tex)")
     opts = parser.parse_args()
 
     root = Path(__file__).resolve().parents[2]
     default_path = root / "tests" / "sample_documents" / "sample.docx"
     target = Path(opts.file) if opts.file else default_path
 
-    # 3) 执行解析
+    # 3) run parser
     dparser = DocumentParser(DeepSeekClient(api_key=key))
     result = dparser.parse_file(target)
 
-    # 4) 打印前 10 条
-    print("[bold green]前 10 条术语[/bold green]")
-    for item in result["terms"][:10]:
+    # 4) show first 10 terms
+    print("[bold green]First 10 terms[/bold green]")
+    for item in result["segments"][:10]:
         short_def = textwrap.shorten(item["definition"], 60)
-        print(f"• {item['term']}: {short_def}")
+        print(f"• {item['term']}: {short_def} \u2192 {item['synonyms']}")
 
-    print("\n[bold blue]元数据[/bold blue]")
+    print("\n[bold blue]Metadata[/bold blue]")
     print(json.dumps(result["metadata"], indent=2, ensure_ascii=False))
