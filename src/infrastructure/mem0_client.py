@@ -168,6 +168,20 @@ class Mem0Client:
             )
         except Exception as exc: # noqa: BLE001
             raise Mem0APIError(f"search failed: {exc}") from exc
+
+    # Public: Delete memory by id
+    def delete_memory(self, memory_id: str) -> Dict[str, Any]:
+        try:
+            return self._client.delete(memory_id)
+        except Exception as exc:  # noqa: BLE001
+            raise Mem0APIError(f"delete failed: {exc}") from exc
+
+    def delete_user_memories(self, user_id: str) -> None:
+        """Delete all memories for a user (used for tests cleanup)"""
+        try:
+            self._client.delete_all(user_id=user_id)
+        except Exception as exc:  # noqa: BLE001
+            raise Mem0APIError(f"delete_user_memories failed: {exc}") from exc
         
     # Health-Check
     def _health_check(self) -> None:
@@ -175,8 +189,9 @@ class Mem0Client:
         Write & immediately retrieve a dummy message to verify pipeline.
         """
         token = f"__health_{uuid.uuid4()}__"
+        mem_id: str | None = None
         try:
-            self._client.add(
+            rsp = self._client.add(
                 [
                     {
                         "role": "user",
@@ -187,10 +202,12 @@ class Mem0Client:
                 user_id="__health_check__",
                 output_format="v1.1",
             )
+            if isinstance(rsp, dict):
+                mem_id = rsp.get("id")
             # If the response time exceeds 7.5 seconds, the access is considered a failure.
             for attempt in range(1, 6):
                 hits = self._client.search(
-                    token, 
+                    token,
                     user_id = "__health_check__",
                     limit = 1
                 )
@@ -201,6 +218,13 @@ class Mem0Client:
             raise Mem0ConnectionError("Mem0ConnectionError: When initialized. Unable to retrieve the data")
         except Exception as exc: # noqa: BLE001
             raise Mem0ConnectionError(f"Mem0ConnectionError: When initialized. error: {exc}") from exc
+        finally:
+            try:
+                if mem_id:
+                    self._client.delete(mem_id)
+                self._client.delete_all(user_id="__health_check__")
+            except Exception:
+                pass
         
 
 ### -------------------------------------------------------
