@@ -201,7 +201,16 @@ class DocumentParser:
         import json, re
         try:
             obj = json.loads(raw)
-            return obj if isinstance(obj, list) else []
+            if isinstance(obj, list):
+                return obj
+            if isinstance(obj, dict):
+                # Common mis-format: single object or wrapper key
+                if {"term", "definition"} <= obj.keys():
+                    return [obj]
+                for key in ("segments", "items", "data"):
+                    if key in obj and isinstance(obj[key], list):
+                        return obj[key]
+            return []
         except json.JSONDecodeError:
             match = re.search(r"```json(.*?)```", raw, re.S)
             if match:
