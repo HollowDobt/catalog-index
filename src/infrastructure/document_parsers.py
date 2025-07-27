@@ -6,6 +6,7 @@ import hashlib  # compute SHA-256
 import json  # decode LLM JSON
 import logging
 import os
+import sys
 import re  # regular expressions
 import textwrap  # console output width
 import zipfile  # unzip .docx
@@ -21,6 +22,7 @@ from pylatexenc.latex2text import LatexNodes2Text  # LaTeX→text
 # internal deps
 from deepseek_client import DeepSeekClient, DeepSeekAPIError
 from mem0_client import Mem0Client
+import config
 
 
 class LLMProtocol(Protocol):
@@ -52,7 +54,8 @@ class DocumentParser:
 
     llm: LLMProtocol
     max_chars: int = 8_000
-    llm_model: str = field(default="deepseek-chat")
+    # default model for parsing
+    llm_model: str = field(default=config.PARSER_MODEL)
 
     # public API
 
@@ -78,20 +81,23 @@ class DocumentParser:
         _start_para = 1
         _para_idx = 0
 
-        for para in para_iter:
-            _para_idx += 1
-            _total_chars += len(para) + 1
-            _chunk.append(para)
+        with tqdm(desc="parse", unit="para", disable=not sys.stderr.isatty()) as pbar, \
+             tqdm(desc="deepseek", unit="call", disable=not sys.stderr.isatty()) as lbar:
+            for para in para_iter:
+                _para_idx += 1
+                _total_chars += len(para) + 1
+                _chunk.append(para)
+                pbar.update(1)
 
-            # send chunk to LLM every 3 paragraphs or when too long
-            if len(_chunk) >= 3 or sum(len(p) for p in _chunk) > self.max_chars:
-                self._update_terms_from_chunk("\n".join(_chunk), _terms, _start_para, _para_idx)
-                _chunk.clear()
-                _start_para = _para_idx + 1
+                # send chunk to LLM every 3 paragraphs or when too long
+                if len(_chunk) >= 3 or sum(len(p) for p in _chunk) > self.max_chars:
+                    self._update_terms_from_chunk("\n".join(_chunk), _terms, _start_para, _para_idx, progress=lbar)
+                    _chunk.clear()
+                    _start_para = _para_idx + 1
 
-        # handle final chunk
-        if _chunk:
-            self._update_terms_from_chunk("\n".join(_chunk), _terms, _start_para, _para_idx)
+            # handle final chunk
+            if _chunk:
+                self._update_terms_from_chunk("\n".join(_chunk), _terms, _start_para, _para_idx, progress=lbar)
 
         segments = []
         for term, info in _terms.items():
@@ -159,6 +165,8 @@ class DocumentParser:
         out: Dict[str, Dict[str, Any]],
         para_start: int,
         para_end: int,
+        *,
+        progress: tqdm | None = None,
     ) -> None:
         """Update *out* with terms extracted from the text chunk via LLM."""
         if not text.strip():
@@ -167,6 +175,8 @@ class DocumentParser:
         raw = ""
         try:
             raw = self._call_llm(text)
+            if progress is not None:
+                progress.update(1)
             data = self._safe_load_json(raw)
             for item in data:
                 term = item.get("term", "").strip()
