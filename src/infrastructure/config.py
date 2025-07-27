@@ -10,7 +10,7 @@ from typing import List, Dict
 
 DEFAULT_MODEL = "deepseek-chat"
 # Model used when parsing documents
-PARSER_MODEL = "deepseek-r1"
+PARSER_MODEL = "deepseek-reasoner"
 DEFAULT_CHAT_PATH = "/v1/chat/completions"
 PING_MESSAGES: List[Dict[str, str]] = [
         {"role": "system", "content": "You are a ping agent."},
