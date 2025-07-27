@@ -212,21 +212,63 @@ class DocumentParser:
                         return obj[key]
             return []
         except json.JSONDecodeError:
+            # Attempt to recover JSON fragment from common formats
             match = re.search(r"```json(.*?)```", raw, re.S)
             if not match:
                 match = re.search(r"({.*}|\[.*\])", raw, re.S)
             if match:
                 return json.loads(match.group(1))
-            raise
+            # Fallback: parse simple structured lines
+            return DocumentParser._parse_structured_lines(raw)
+
+    @staticmethod
+    def _parse_structured_lines(raw: str) -> List[Dict[str, Any]]:
+        """Extract term segments from simple 'Term:' style text."""
+        items: List[Dict[str, Any]] = []
+        current: Dict[str, Any] = {}
+        for line in raw.splitlines():
+            line = line.strip()
+            if not line:
+                if current:
+                    items.append(current)
+                    current = {}
+                continue
+            m = re.match(r"Term\s*:\s*(.+)", line, re.I)
+            if m:
+                if current:
+                    items.append(current)
+                    current = {}
+                current = {"term": m.group(1).strip(), "definition": "", "synonyms": []}
+                continue
+            m = re.match(r"Definition\s*:\s*(.+)", line, re.I)
+            if m:
+                if not current:
+                    current = {"term": "", "definition": "", "synonyms": []}
+                current["definition"] = m.group(1).strip()
+                continue
+            m = re.match(r"Synonyms?\s*:\s*(.+)", line, re.I)
+            if m:
+                syns = [s.strip() for s in re.split(r",|;", m.group(1)) if s.strip()]
+                if not current:
+                    current = {"term": "", "definition": "", "synonyms": []}
+                current["synonyms"] = syns
+                continue
+            if current:
+                if current.get("definition"):
+                    current["definition"] += " " + line
+                else:
+                    current["definition"] = line
+        if current:
+            items.append(current)
+        return items
 
 
     def _call_llm(self, text: str) -> str:
-        """Call the LLM to extract terms, expecting strictly JSON output."""
+        """Call the LLM to extract terms. Output may be free-form."""
         sys_msg = (
-            "You are a research assistant. Extract terms only.\n"
-            "Return a strict JSON array with keys term, synonyms and definition.\n"
-            "synonyms should be a string array and may be empty.\n"
-            "Return nothing except JSON."
+            "You are a research assistant. Extract glossary terms from the text.\n"
+            "Provide each term with a definition and optional synonyms.\n"
+            "Format the response as either JSON or lines starting with 'Term:'."
         )
         rsp = self.llm.chat_completion(
             messages=[
@@ -236,7 +278,6 @@ class DocumentParser:
             model=self.llm_model,
             temperature=0.1,
             max_tokens=1536,
-            response_format={"type": "json_object"},  # ✅ DeepSeek 兼容
             stream=False,
         )
         content = rsp.get("choices", [{}])[0].get("message", {}).get("content", "")
