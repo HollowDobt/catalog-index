@@ -213,6 +213,8 @@ class DocumentParser:
             return []
         except json.JSONDecodeError:
             match = re.search(r"```json(.*?)```", raw, re.S)
+            if not match:
+                match = re.search(r"({.*}|\[.*\])", raw, re.S)
             if match:
                 return json.loads(match.group(1))
             raise
@@ -237,7 +239,10 @@ class DocumentParser:
             response_format={"type": "json_object"},  # ✅ DeepSeek 兼容
             stream=False,
         )
-        return rsp["choices"][0]["message"]["content"]
+        content = rsp.get("choices", [{}])[0].get("message", {}).get("content", "")
+        if isinstance(content, dict):
+            return json.dumps(content)
+        return str(content)
 
 
 class PaperParser(DocumentParser):

@@ -22,3 +22,4 @@ def test_parse_file(tmp_path):
     result = parser.parse_file(sample)
     assert result["segments"][0]["term"] == "Alpha"
     assert result["segments"][0]["synonyms"] == ["A"]
+
