@@ -266,9 +266,12 @@ class DocumentParser:
     def _call_llm(self, text: str) -> str:
         """Call the LLM to extract terms. Output may be free-form."""
         sys_msg = (
-            "You are a research assistant. Extract glossary terms from the text.\n"
-            "Provide each term with a definition and optional synonyms.\n"
-            "Format the response as either JSON or lines starting with 'Term:'."
+            "你是一个只会输出纯 JSON 格式内容的科研助手. 你只需要把自己当做一个 JSON 输出器, 不得输出除了 JSON 语法允许的其他内容.\n",
+            "你需要解析科研论文的截取文段, 着重关注论文的结论句, 引用句和定义句.\n",
+            "你需要不断提取文段结论句, 引用句和定义句中的关键词. 关键词是指文中有直接定义或者作为结论的词汇.\n",
+            "仅使用文段中与关键词有关联的字词, 将关键词和对应的文中的定义与示例与文章本身对应的存储起来.\n",
+            "然后将这些关键词-定义-示例-元数据统一输出为 JSON 格式内容. 前面已经提过.\n",
+            "JSON 中某一关键词构成的组包括内容有且仅有为 {\"term\": \"...\", \"definition\": \"...\", \"synoyms\": \"...\"}\n"
         )
         rsp = self.llm.chat_completion(
             messages=[

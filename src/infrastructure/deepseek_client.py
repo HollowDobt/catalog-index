@@ -16,6 +16,7 @@ src/infrastructure/deepseek_client.py
 """
 
 from __future__ import annotations
+
 from dataclasses import dataclass, field
 from typing import List, Dict, Any, Optional
 import json
@@ -131,7 +132,7 @@ class DeepSeekClient:
         """
         try:
             result = self.chat_completion(
-                config.PING_MESSAGES,
+                config.DEEPSEEK_PING_MESSAGES,
                 model=config.DEFAULT_MODEL,
                 temperature=0.0,
                 max_token=1,
