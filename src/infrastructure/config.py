@@ -14,6 +14,11 @@ load_dotenv()
 
 NS = {"w": "http://schemas.openxmlformats.org/wordprocessingml/2006/main"}
 
+# Light Model & Cannot Coding
+DEFAULT_LIGHT_MODEL = "deepseek-chat"
+
+
+
 # DeepSeek Model Chat Class
 # (It is recommended to use an open source conversation model optimized for this subject)
 DEFAULT_MODEL = "deepseek-chat"
@@ -32,7 +37,7 @@ MEM0_API_KEY = os.getenv("MEM0_API_KEY")
 DEFAULT_CHAT_PATH = "/v1/chat/completions"
 
 # Test Message
-DEEPSEEK_PING_MESSAGES: List[Dict[str, str]] = [
+LLMCLIENT_TEST_PING_MESSAGES: List[Dict[str, str]] = [
         {"role": "system", "content": "You are a ping agent."},
         {"role": "user", "content": "ping"},
 ]
