@@ -1,0 +1,99 @@
+from typing import Dict, Any, List
+from mem0 import Memory
+
+
+class MemoryLayer:
+    """
+    Memory Layer/Parsed Content Storage Layer
+    Implementation using mem0 as the underlying storage system.
+    """
+
+    def __init__(self):
+        """Initialize the memory layer with a mem0 Memory instance"""
+        self._memory = Memory()
+
+    def search(self, meta_data: Dict[str, Any]) -> str:
+        """
+        Search the memory layer using meta_data as query parameters.
+
+        Args:
+            meta_data: Dictionary containing search parameters. Expected to contain:
+                      - "query": The search query string
+                      - "user_id": The user identifier (optional, defaults to "default_user")
+                      - "limit": Maximum number of results to return (optional)
+
+        Returns:
+            str: A formatted string containing all matching memories joined by newlines
+        """
+        # Extract search parameters from meta_data with defaults
+        query = meta_data.get("query", "")
+        user_id = meta_data.get("user_id", "default_user")
+        limit = meta_data.get("limit", 3)
+
+        # Perform the search using mem0
+        relevant_memories = self._memory.search(query=query, user_id=user_id, limit=limit)
+
+        # Format the results into a string
+        if not relevant_memories or "results" not in relevant_memories:
+            return ""
+
+        memories_str = "\n".join(
+            f"- {entry['memory']}"
+            for entry in relevant_memories["results"]
+        )
+
+        return memories_str
+
+    def add_memory(self, meta_data: Dict[str, Any]) -> None:
+        """
+        Add memory to the storage layer using meta_data as tags.
+
+        Args:
+            meta_data: Dictionary containing memory data. Expected to contain:
+                      - "content": The memory content to store
+                      - "user_id": The user identifier (optional, defaults to "default_user")
+                      - Additional metadata that will be stored with the memory
+        """
+        # Extract content and user_id with defaults
+        content = meta_data.get("content", "")
+        user_id = meta_data.get("user_id", "default_user")
+
+        # Prepare the memory entry
+        memory_entry = {
+            "memory": content,
+            **{k: v for k, v in meta_data.items() if k not in ["content", "user_id"]}
+        }
+
+        # Add to memory storage
+        self._memory.add(memory_entry, user_id=user_id)
+
+
+# Example usage
+if __name__ == "__main__":
+    # Initialize memory layer
+    memory_layer = MemoryLayer()
+
+    # Add some memories
+    memory_layer.add_memory({
+        "content": "User prefers Python over Java",
+        "user_id": "test_user",
+        "category": "programming",
+        "timestamp": "2023-01-01"
+    })
+
+    memory_layer.add_memory({
+        "content": "User's favorite color is blue",
+        "user_id": "test_user",
+        "category": "preference",
+        "timestamp": "2023-01-02"
+    })
+
+    # Search memories
+    search_results = memory_layer.search({
+        "query": "color",
+        "user_id": "test_user",
+        "limit": 2
+    })
+
+    print("Search Results:")
+    print(search_results)
