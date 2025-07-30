@@ -166,4 +166,4 @@ if __name__ == "__main__":
         max_tokens = 100,
     )
     
-    print("[DeepSeek] Hello ->", reply["choices"][0]["message"]["content"])
+    print("[DeepSeek 💭] Reply ->", reply["choices"][0]["message"]["content"])
