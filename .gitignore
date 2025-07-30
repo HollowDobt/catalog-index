@@ -1,4 +1,6 @@
 .env
+.private.env
+.public.env
 .venv/
 __pycache__/
 .DS_Store

@@ -33,7 +33,7 @@ class LLMClient(ABC):
         """
         def decorator(subcls: Type["LLMClient"]):
             if name in cls._registry:
-                raise KeyError(f"LLMClinet provider '{name}' cannot be registered again.")
+                raise KeyError(f"LLMClient provider '{name}' cannot be registered again.")
             cls._registry[name] = subcls
             return subcls
         return decorator
@@ -63,7 +63,7 @@ class LLMClient(ABC):
         
         Return All Messages & Information
         """
-        
+    
     @abstractmethod
     def _health_check(self) -> None:
         """
