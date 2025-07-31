@@ -12,8 +12,8 @@ from dotenv import load_dotenv
 import xml.etree.ElementTree as ET
 import requests
 
-from dataclasses import dataclass, field
-from typing import List, Dict, Any, Optional
+from dataclasses import dataclass
+from typing import List, Dict, Any
 from pathlib import Path
 
 from infrastructure.academicDB_client import AcademicDBClient
@@ -48,8 +48,8 @@ class ArxivClient(AcademicDBClient):
 
     base_url: str | None = os.getenv("ARXIV_BASE_URL")
     end_point: str | None = os.getenv("ARXIV_ENDPOINT")
-    time_out: int | None = int(_time_out) if _time_out is not None else None
-    access_rate: float | None = float(_raw_delay) if _raw_delay is not None else None
+    time_out: int | None = int(_time_out) if _time_out else None
+    access_rate: float | None = float(_raw_delay) if _raw_delay else None
     
     
     def __post_init__(self) -> None:
@@ -73,8 +73,8 @@ class ArxivClient(AcademicDBClient):
         if missing_value:
             raise ValueError(f"{missing_value} is not found in .private.env and .public.env")
         
-        assert self.base_url is not None, "base_url required"
-        assert self.time_out is not None, "time_out required"
+        assert self.base_url, "base_url required"
+        assert self.time_out, "time_out required"
         
         try:
             response = self.search_get_metadata(query="cat:cs.LG", max_num=1)
@@ -110,8 +110,9 @@ class ArxivClient(AcademicDBClient):
             "search_query": query,
             "max_results": max_num,
         }
-        assert self.base_url is not None, "base_url required"
-        url = f"{self.base_url.rstrip("/")}{self.end_point}"
+        assert self.base_url, "base_url required"
+        assert self.end_point, "end_point required"
+        url = f"{self.base_url.rstrip("/")}/{self.end_point.lstrip("/")}"
         
         try:
             response = requests.get(url, params=params, timeout=self.time_out)
@@ -142,25 +143,28 @@ class ArxivClient(AcademicDBClient):
                 data: Dict[str, Any] = {}
                 
                 # Basic fields
-                for tag in ("title", "id", "published", "updated", "summary"):
-                    elem = entry.find(f"atom:{tag}", NS)
-                    if elem is not None and elem.text:
-                        data[tag] = elem.text
+                for field in ("title", "id", "published", "updated", "summary"):
+                    text_val = entry.findtext(f"atom:{field}", default="", namespaces=NS)
+                    if text_val:
+                        data[field] = text_val.strip()
                 
                 # Author fields
                 authors: List[Dict[str, Any]] = []
                 for author in entry.findall("atom:author", NS):
-                    name_elem = author.find("atom:name", NS)
-                    aff_elem = author.find("arxiv:affiliation", NS)
-                    author_info: Dict[str, Any] = {}
-                    
-                    if name_elem is not None:
-                        author_info["name"] = name_elem.text
-                    if aff_elem is not None:
-                        author_info["affiliation"] = aff_elem.text
-                    if author_info is not None:
-                        authors.append(author_info)
-                    
+                    # name_elem = author.find("atom:name", NS)
+                    name_elem = author.findtext("atom:name", default="", namespaces=NS).strip()
+                    # aff_elem = author.find("arxiv:affiliation", NS)
+                    affs: List[str] = []
+                    for aff_elem in author.findall("arxiv:affiliation", NS):
+                        if aff_elem.text and aff_elem.text.strip():
+                            affs.append(aff_elem.text.strip())
+                    if name_elem or affs:
+                        authors.append(
+                            {
+                                "name": name_elem,
+                                **({"affiliations": affs} if affs else {})
+                            }
+                        )
                 if authors:
                     data["authors"] = authors
                 
@@ -178,7 +182,7 @@ class ArxivClient(AcademicDBClient):
                 for link in entry.findall("atom:link", NS):
                     links.append(
                         {
-                            "herf": link.attrib.get("href", ""),
+                            "href": link.attrib.get("href", ""),
                             "rel": link.attrib.get("rel", ""),
                             "type": link.attrib.get("type", ""),
                             **({"title": link.attrib["title"]} if "title" in link.attrib else {}),
@@ -189,15 +193,19 @@ class ArxivClient(AcademicDBClient):
                 
                 # Arxiv other expand contents
                 primary_cat = entry.find("arxiv:primary_category", NS)
-                if primary_cat is not None and "term" in primary_cat.attrib:
+                if primary_cat and "term" in primary_cat.attrib:
                     data["arxiv_primary_category"] = primary_cat.attrib["term"]
                 
                 for tag in ("comment", "journal_ref", "doi"):
                     elem = entry.find(f"arxiv:{tag}", NS)
-                    if elem is not None and elem.text:
+                    if elem and elem.text:
                         data[f"arxiv_{tag}"] = elem.text
                 
                 result.append(data)
             return result
+        
         except Exception as exc:
             raise ArxivConnectError(f"Failed to parse XML response: {exc}") from exc
+    
+    def single_metadata_parser(self, meta_data: Dict[str, Any]) -> str:
+        ...

@@ -51,7 +51,7 @@ class DeepSeekClient(LLMClient):
     api_key: str | None = os.getenv("DEEPSEEK_API_KEY")
     base_url: str | None = os.getenv("DEEPSEEK_BASE_URL")
     end_point: str | None = os.getenv("DEEPSEEK_ENDPOINT")
-    time_out: int | None = int(_raw_timeout) if _raw_timeout is not None else None
+    time_out: int | None = int(_raw_timeout) if _raw_timeout else None
     
     
     def __post_init__(self) -> None:
@@ -105,8 +105,8 @@ class DeepSeekClient(LLMClient):
         """
         Post request to DeepSeek Client
         """
-        assert self.base_url is not None, "base_url required"
-        assert self.end_point is not None, "end_point required"
+        assert self.base_url, "base_url required"
+        assert self.end_point, "end_point required"
         url = self.base_url.rstrip("/") + self.end_point
         response = requests.post(
             url,
