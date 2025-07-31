@@ -1,111 +1,70 @@
-from typing import List, Dict, Any
-import requests
-import time
-from urllib.parse import urlencode
-import feedparser
+"""
+=======================================
+|src/infrastructure/database_client.py|
+=======================================
+
+Abstract Acdemic Data Base(ADB) tools class
+"""
+
+from abc import ABC, abstractmethod
+from typing import Type, Dict, Any, List
 
 
-class DataBase:
+class AcademicDBClient(ABC):
     """
-    A unified abstraction layer for scientific research databases. 
-    Currently implements the arXiv.org API standard.
-    arXiv is open-access and free to use with no API requirements.
-
-    Attributes:
-        base_url (str): Base URL for arXiv API
-        delay (float): Delay between requests in seconds (to respect API rate limits)
+    Abstract ADB tools class
     """
 
-    def __init__(self):
-        self.base_url = "http://export.arxiv.org/api/query?"
-        self.delay = 0.34  # ~3 requests per second rate limit
+    _registry: Dict[str, Type["AcademicDBClient"]] = {}
 
-    def request(self, query: str) -> List[Dict[str, Any]]:
+    ### Function used when instantiating the abstract base class
+    @classmethod
+    def register(cls, name: str):
         """
-        Fetch metadata from arXiv API feed.
-        Respects rate limit of 3 requests per second.
+        ADB client registration function,
+        the return value is the decorator function
 
-        Args:
-            query: Search query string
-
-        Returns:
-            List of dictionaries containing paper metadata
-
-        Raises:
-            ValueError: If API request fails
+        Example:
+            @AcademicDBClient("arxiv")
+            class ArxivClient(AcademicDBClient):
+                ...
         """
-        params = {
-            'search_query': query,
-            'start': 0,
-            'max_results': 10  # Default to 10 results
-        }
-        url = self.base_url + urlencode(params)
 
-        try:
-            response = requests.get(url)
-            response.raise_for_status()
-            feed = feedparser.parse(response.content)
+        def decorator(subcls: Type["AcademicDBClient"]):
+            if name in cls._registry:
+                raise KeyError(f"AcademicDBClient provider '{name}' cannot be registered again.")
+            cls._registry[name] = subcls
+            return subcls
 
-            # Respect API rate limit
-            time.sleep(self.delay)
+        return decorator
 
-            # Extract metadata
-            metadata_list = []
-            for entry in feed.entries:
-                metadata = {
-                    'title': entry.title,
-                    'authors': [author.name for author in entry.authors],
-                    'published': entry.published,
-                    'summary': entry.summary,
-                    'arxiv_id': entry.id.split('/abs/')[-1],
-                    'pdf_url': None  # Will be populated below
-                }
-
-                # Find PDF and HTML links
-                for link in entry.links:
-                    if link.rel == 'alternate' and link.type == 'text/html':
-                        metadata['arxiv_url'] = link.href
-                    elif link.title == 'pdf':
-                        metadata['pdf_url'] = link.href
-
-                metadata_list.append(metadata)
-
-            return metadata_list
-
-        except requests.exceptions.RequestException as e:
-            raise ValueError(f"API request failed: {str(e)}")
-
-    def fetch_and_parser(self, meta_data: Dict[str, Any]) -> str:
+    @classmethod
+    def create(cls, provider_name: str, **kwargs: Any) -> "AcademicDBClient":
         """
-        Fetch and parse paper content based on metadata.
-
-        Args:
-            meta_data: Dictionary containing paper metadata, must contain either 
-                     'pdf_url' or 'arxiv_id'
-
-        Returns:
-            Extracted text content of the paper
-
-        Raises:
-            ValueError: If paper cannot be retrieved
+        Find the instantiation method of the corresponding subclass by name
         """
-        if 'pdf_url' in meta_data and meta_data['pdf_url']:
-            url = meta_data['pdf_url']
-        elif 'arxiv_id' in meta_data:
-            url = f"https://arxiv.org/pdf/{meta_data['arxiv_id']}.pdf"
-        else:
-            raise ValueError("Metadata missing both pdf_url and arxiv_id")
+        subcls = cls._registry.get(provider_name)
+        if subcls is None:
+            valid = ", ".join(cls._registry.keys())
+            raise ValueError(f"Unknown AcademicDBClient provider name '{provider_name}'. Available: {valid}")
+        return subcls(**kwargs)
 
-        try:
-            # Respect API rate limit
-            time.sleep(self.delay)
+    ### Required function for subclasses
+    @abstractmethod
+    def search_get_metadata(self, query: str, max_num: int) -> List[Dict[str, Any]]:
+        """
+        Get metadata from AcademicDB API through Regular expression search.
+        This function will return a list of metadata which meet requirements.
+        """
 
-            response = requests.get(url)
-            response.raise_for_status()
+    @abstractmethod
+    def single_metadata_parser(self, meta_data: Dict[str, Any]) -> str:
+        """
+        Get a single article through metadata.
+        """
 
-            # Placeholder for PDF parsing logic
-            # In production, implement proper PDF parsing using PyPDF2/pdfminer etc.
-            return f"PDF content (requires parsing): {url}"
-
-        except requests.exceptions.RequestException as e:
-            raise ValueError(f"Failed to fetch paper: {str(e)}")
+    @abstractmethod
+    def _health_check(self) -> None:
+        """
+        Health check function (initialization check and debug mode enablement)
+        """
