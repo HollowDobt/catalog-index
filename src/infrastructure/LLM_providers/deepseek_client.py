@@ -67,7 +67,7 @@ class DeepSeekClient(LLMClient):
     
     def _health_check(self) -> None:
         """
-        Health check function (initialization check and debug mode enablement)
+        Initiate a standard request to determine if there is a normal response
         """
         
         # First confirm that the client variable has been set
@@ -94,7 +94,7 @@ class DeepSeekClient(LLMClient):
             )
             _response = response["choices"][0]["message"]["content"] #noqa: B018
         except Exception as exc:
-            print(f"DeepSeek initalize error. This often happens when base_url, api, or end_point are incorrect.")
+            print("DeepSeek initalize error. This often happens when base_url, api, or end_point are incorrect.")
             raise DeepSeekInitConnectError("Unable to connect to DeepSeek server") from exc
         
     

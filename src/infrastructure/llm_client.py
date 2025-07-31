@@ -3,7 +3,7 @@
 |/src/infrastructure/LLMClient.py|
 ==================================
 
-# Abstract large model tools class
+# Abstract LLM tools class
 """
 
 
@@ -46,7 +46,7 @@ class LLMClient(ABC):
         subcls = cls._registry.get(provider_name)
         if subcls is None:
             valid = ", ".join(cls._registry.keys())
-            raise ValueError(f"Unknown provider name '{provider_name}'. Available: {valid}")
+            raise ValueError(f"Unknown LLMClient provider name '{provider_name}'. Available: {valid}")
         return subcls(**kwargs)
     
     
@@ -64,6 +64,7 @@ class LLMClient(ABC):
         Return All Messages & Information
         """
     
+    
     @abstractmethod
     def _health_check(self) -> None:
         """
@@ -73,6 +74,7 @@ class LLMClient(ABC):
         
         Using DEFAUL_LIGHT_MODEL
         """
+    
     
     @abstractmethod
     def _post(
@@ -92,6 +94,7 @@ class LLMClient(ABC):
         Generate API requests to scientific databases upon request 
         """
     
+    
     @abstractmethod
     def analyze(
         self,
@@ -100,6 +103,7 @@ class LLMClient(ABC):
         """
         Parse the article into structured text
         """
+    
     
     @abstractmethod
     def find_connect(
