@@ -71,3 +71,10 @@ class AcademicDBClient(ABC):
         """
         Health check function (initialization check and debug mode enablement)
         """
+
+
+    @abstractmethod
+    def multi_metadata_parser(self, meta_data_list: List[Dict[str, Any]]) -> List[str]:
+        """
+        Get a lot of articles through metadata.
+        """

@@ -8,11 +8,11 @@
 
 
 import os
-import re
 from dotenv import load_dotenv
 import xml.etree.ElementTree as ET
 import requests
-import tempfile
+from tqdm import tqdm
+import time
 
 from dataclasses import dataclass
 from typing import List, Dict, Any
@@ -212,6 +212,7 @@ class ArxivClient(AcademicDBClient):
         except Exception as exc:
             raise ArxivConnectError(f"Failed to parse XML response: {exc}") from exc
     
+    
     def single_metadata_parser(self, meta_data: Dict[str, Any]) -> str:
         """
         Download the PDF associated with a single metadata record and store it
@@ -265,3 +266,25 @@ class ArxivClient(AcademicDBClient):
         
         except Exception as exc:
             raise ArxivConnectError(f"Unable to connect to arxiv.org to get pdf files.")
+        
+    
+    def multi_metadata_parser(self, meta_data_list: List[Dict[str, Any]]) -> List[str]:
+        """
+        From search_get_metadata download pdf files.
+        """
+        download_paths: List[str] = []
+        
+        # Displaying a progress bar using tqdm
+        for meta_data in tqdm(meta_data_list, desc="Downloading PDFs", unit="file"):
+            start_time = time.time()
+            try:
+                path = self.single_metadata_parser(meta_data=meta_data)
+                download_paths.append(path)
+            except Exception as exc:
+                raise ArxivConnectError(f"Failed to download PDF, {meta_data}: {exc}")
+            
+            elapsed = time.time() - start_time
+            if elapsed < 3:
+                time.sleep(elapsed)
+            
+        return download_paths
