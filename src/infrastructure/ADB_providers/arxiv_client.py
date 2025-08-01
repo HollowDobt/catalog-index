@@ -8,9 +8,11 @@
 
 
 import os
+import re
 from dotenv import load_dotenv
 import xml.etree.ElementTree as ET
 import requests
+import tempfile
 
 from dataclasses import dataclass
 from typing import List, Dict, Any
@@ -34,7 +36,12 @@ class ArxivConnectError(RuntimeError):
     """
     Failed to get 200 code.
     """
-    
+
+class ArxivMissingMetadataError(RuntimeError):
+    """
+    Missing metadata
+    """
+
     
 @dataclass
 @AcademicDBClient.register("arxiv")
@@ -49,7 +56,6 @@ class ArxivClient(AcademicDBClient):
     base_url: str | None = os.getenv("ARXIV_BASE_URL")
     end_point: str | None = os.getenv("ARXIV_ENDPOINT")
     time_out: int | None = int(_time_out) if _time_out else None
-    access_rate: float | None = float(_raw_delay) if _raw_delay else None
     
     
     def __post_init__(self) -> None:
@@ -66,7 +72,6 @@ class ArxivClient(AcademicDBClient):
         missing_value = (
             "base_url"    if self.base_url    is None else
             "time_out"    if self.time_out    is None else
-            "access_rate" if self.access_rate is None else
             None
         )
         
@@ -193,12 +198,12 @@ class ArxivClient(AcademicDBClient):
                 
                 # Arxiv other expand contents
                 primary_cat = entry.find("arxiv:primary_category", NS)
-                if primary_cat and "term" in primary_cat.attrib:
+                if primary_cat is not None and "term" in primary_cat.attrib:
                     data["arxiv_primary_category"] = primary_cat.attrib["term"]
                 
                 for tag in ("comment", "journal_ref", "doi"):
                     elem = entry.find(f"arxiv:{tag}", NS)
-                    if elem and elem.text:
+                    if elem is not None and elem.text:
                         data[f"arxiv_{tag}"] = elem.text
                 
                 result.append(data)
@@ -208,4 +213,55 @@ class ArxivClient(AcademicDBClient):
             raise ArxivConnectError(f"Failed to parse XML response: {exc}") from exc
     
     def single_metadata_parser(self, meta_data: Dict[str, Any]) -> str:
-        ...
+        """
+        Download the PDF associated with a single metadata record and store it
+        under the system cache directory ``<cache>/library-index/download-files``.
+        """
+        
+        # Locate PDF URL
+        pdf_url: str | None = None
+        for link in meta_data.get("links", []):
+            if link.get("type") == "application/pdf":
+                pdf_url = link.get("href")
+                break
+        
+        # Fallback: construct from arXiv id
+        if pdf_url is None and meta_data.get("id"):
+            id_part = meta_data["id"].rsplit("/", 1)[-1]
+            pdf_url = f"https://arxiv.org/pdf/{id_part}.pdf"
+        
+        if pdf_url is None:
+            raise ArxivConnectError("Unable to obtain the specified PDF file. Please check whether the network connection or metadata is normal."
+                                    f"matadata: {meta_data["id"]}")
+        
+        # Build target path
+        file_name: str = ""
+        try:
+            arxiv_id = meta_data["id"].rsplit("/", 1)[-1]
+            file_name = f"{arxiv_id}.pdf"
+        except Exception as exc:
+            raise ArxivMissingMetadataError("Missing key metadata: id")
+        
+        cache_root = Path(os.getenv("XDG_CACHE_HOME", Path.home() / ".cache"))
+        target_dir = cache_root / "library-index" / "download-files" / "arxiv"
+        target_dir.mkdir(parents=True, exist_ok=True)
+        file_path = target_dir / file_name
+        
+        # Download (skip if already present)
+        if file_path.exists() and file_path.stat().st_size > 0:
+            return f"{file_path}"
+        
+        try:
+            with requests.get(pdf_url, stream=True, timeout=self.time_out) as response:
+                if response.status_code // 100 != 2:
+                    raise ArxivConnectError(f"Download failed: {response.reason[:200]}")
+                
+                with open(file_path, "wb") as fh:
+                    for chunk in response.iter_content(chunk_size=8192):
+                        if chunk:
+                            fh.write(chunk)
+            
+            return f"{file_path}"
+        
+        except Exception as exc:
+            raise ArxivConnectError(f"Unable to connect to arxiv.org to get pdf files.")
