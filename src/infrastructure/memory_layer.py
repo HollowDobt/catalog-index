@@ -1,49 +1,48 @@
 """
----------------------------------
-src/infrastructure/mem0_client.py
----------------------------------
+===================================
+|src/infrastructure/mem0_client.py|
+===================================
 
-# Simple encapsulation of requests to mem0 servers, 
-# implemented as Mem0Client class.
-
-# WARN: The new additions to the vector database are close to real-time, 
-# but not immediate. Therefore, a certain response time must be allowed for each test. 
-# If the response time exceeds 7.5 seconds, the access is considered a failure.
-
-- Hosted / self-hosted REST ->  MemoryClient(host, api_key)
-- Local open-source mode    ->  Memory()
+Simple encapsulation of requests to mem0 servers, 
 """
+
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
-from typing import Dict, Optional, Any, List, Union
-from dotenv import load_dotenv
 import os
 import uuid
 import time
+from dotenv import load_dotenv
 
+from dataclasses import dataclass, field
+from typing import Dict, Optional, Any, List, Union
+from pathlib import Path
 from mem0 import Memory, MemoryClient
 
+DOT_ENV_PATH_PUBLIC = Path(__file__).parent.parent.parent / ".public.env"
+DOT_ENV_PATH_PRIVATE = Path(__file__).parent.parent.parent / ".private.env"
+load_dotenv(DOT_ENV_PATH_PUBLIC)
+load_dotenv(DOT_ENV_PATH_PRIVATE)
 
-load_dotenv()
 
-
-### -------------------------------------------------------
-### Exception class definition
-### -------------------------------------------------------
-
-class Mem0ConnectionError(RuntimeError):
+class Mem0InitConnectError(RuntimeError):
     """
-    Failed to pass health check during initialization.
-    Generally, the user enters an error URL or API.
+    Failed to get 200 code when initialization.
     """
 
-class Mem0APIError(RuntimeError):
+class Mem0ConnectError(RuntimeError):
     """
-    Thrown when write/check fails at runtime
-    Further analysis is required based on the error code.
+    Failed to get 200 code.
     """
+
+
+MEM0_PING_CONTENT = f"__health_{uuid.uuid4()}__"
+MEM0_PING_MESSAGES: List[Dict[str, str]] = [
+        {
+                "role": "user",
+                "content": MEM0_PING_CONTENT
+        }
+]
 
 
 ### -------------------------------------------------------
@@ -69,59 +68,37 @@ class Mem0Client:
     """
     High-level wrapper for mem0 SDK.
     
-    Parameters
-    ----------
-    api_key : str | None
-        Required for hosted mode; None is optional for self-built mode.
-    use_hosted : bool
-        True: Use platform-hosted Graph Memory;
-        False: Use open source Memory + self-built graph storage (Neo4j).
-    graph_config : dict
-        Self-built graph storage parameters; activate only when use_hosted=False
-        dict(    
-            provider="neo4j",
-            url="bolt://localhost:7687",
-            username="neo4j",
-            password="password",
-        )
-    vector_config : dict, optional
-        Custom vector storage parameters.
-        Usually keep None, use mem0 default HybridStore
+    Default host = https://api.mem0.ai
     """
     
-    host: Optional[str] = config.MEM0_BASE_URL
-    api_key: Optional[str] = None
+    host: str | None = os.getenv("MEM0_BASE_URL")
+    api_key: str | None = os.getenv("MEM0_API_KEY")
     
     _client: Any = field(init=False, repr=False)
     
-    # Post-initialization transaction hook function(Life Cycle)
     def __post_init__(self) -> None:
-        host = (self.host or "").strip()
-        self.api_key = self.api_key or config.MEM0_API_KEY
+        
+        host = self.host if self.host else "https://api.mem0.ai"
         
         try:
             if host:
                 if not self.api_key:
-                    raise ValueError("In host mode, you must provide api_key or set MEM0_API_KEY.")
-                self._client = MemoryClient(host=host, 
-                                            api_key=self.api_key)
+                    raise ValueError("In host mode, you must set MEM0_API_KEY.")
+                self._client = MemoryClient(host=host, api_key=self.api_key)
             else:
-                
                 # TODO 尚未完成本地直接调用部分. 考虑到实际情况, 可能会放弃此方案.
-                
                 self._client = Memory()
         
         except Exception as exc: # noqa: BLE001
-            raise Mem0ConnectionError(f"Mem0 Initialization failed: {exc}") from exc
-        
+            raise Mem0InitConnectError(f"Mem0 Initialization failed: {exc}") from exc
         self._health_check()
+
     
-    # Public: Add memory to database
     def add_memory(
         self,
         messages: Union[str, List[Dict[str, str]]],
         *,
-        metadata: Optional[Dict[str, Any]] = None,
+        metadata: Dict[str, Any],
         user_id: str = "Undefined",
         infer: Optional[bool] = False
     ) -> Dict[str, Any]:
@@ -137,9 +114,8 @@ class Mem0Client:
                 user_id=user_id
             )
         except Exception as exc: # noqa: BLE001
-            raise Mem0APIError(f"add_memory Failed: {exc}") from exc
+            raise Mem0ConnectError(f"add_memory Failed: {exc}") from exc
 
-    # Public: Search memory in database
     def search(
         self,
         query: str,
@@ -157,24 +133,20 @@ class Mem0Client:
                 limit=limit
             )
         except Exception as exc: # noqa: BLE001
-            raise Mem0APIError(f"search failed: {exc}") from exc
+            raise Mem0ConnectError(f"search failed: {exc}") from exc
 
-    # Public: Delete memory by id
     def delete_memory(self, memory_id: str) -> Dict[str, Any]:
         try:
             return self._client.delete(memory_id)
         except Exception as exc:  # noqa: BLE001
-            raise Mem0APIError(f"delete failed: {exc}") from exc
+            raise Mem0ConnectError(f"delete failed: {exc}") from exc
 
-    # Public(Recommend delete ALL test messages using this function)
     def delete_user_memories(self, user_id: str) -> None:
-        """Delete all memories for a user (used for tests cleanup)"""
         try:
             self._client.delete_all(user_id=user_id)
         except Exception as exc:  # noqa: BLE001
-            raise Mem0APIError(f"delete_user_memories failed: {exc}") from exc
+            raise Mem0ConnectError(f"delete_user_memories failed: {exc}") from exc
         
-    # Health-Check
     def _health_check(self) -> None:
         """
         Write & immediately retrieve a dummy message to verify pipeline.
@@ -182,7 +154,7 @@ class Mem0Client:
         mem_id: str | None = None
         try:
             response = self._client.add(
-                config.MEM0_PING_MESSAGES,
+                MEM0_PING_MESSAGES,
                 infer=False,
                 user_id="__health_check__",
                 output_format="v1.1",
@@ -192,7 +164,7 @@ class Mem0Client:
             # If the response time exceeds 7.5 seconds, the access is considered a failure.
             for attempt in range(1, 6):
                 hits = self._client.search(
-                    query=config.MEM0_PING_CONTENT,
+                    query=MEM0_PING_CONTENT,
                     user_id = "__health_check__",
                     limit = 1
                 )
@@ -200,21 +172,17 @@ class Mem0Client:
                     return
                 sleep_for = 0.5 * attempt
                 time.sleep(sleep_for)
-            raise Mem0ConnectionError("Mem0ConnectionError: When initialized. Unable to retrieve the data.")
+            raise Mem0ConnectError("Mem0ConnectionError: When initialized. Unable to retrieve the data.")
         except Exception as exc: # noqa: BLE001
-            raise Mem0ConnectionError(f"Mem0ConnectionError: When initialized. error: {exc}.") from exc
+            raise Mem0ConnectError(f"Mem0ConnectionError: When initialized. error: {exc}.") from exc
         finally:
             try:
                 if mem_id:
                     self.delete_memory(mem_id)
                 self.delete_user_memories(user_id="__health_check__")
             except Exception:
-                raise Mem0ConnectionError("Mem0ConnectionError: When initialized. Unable to delete written memory.")
+                raise Mem0ConnectError("Mem0ConnectionError: When initialized. Unable to delete written memory.")
         
-
-### -------------------------------------------------------
-### USE FOR TEST
-### -------------------------------------------------------
 
 if __name__ == "__main__":
     import os
@@ -223,7 +191,7 @@ if __name__ == "__main__":
     
     def test_add_and_search():
         client = Mem0Client()  # 默认托管平台
-        client.add_memory("Graph-vector demo", user_id="__ci__")
+        client.add_memory("Graph-vector demo", user_id="__ci__", metadata={"Name": "Flower Dance",})
         out = client.search("graph-vector", user_id="__ci__", limit=1)
         client.delete_user_memories(user_id="__ci__")
         print(out)
