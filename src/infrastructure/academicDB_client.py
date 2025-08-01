@@ -3,7 +3,7 @@
 |src/infrastructure/database_client.py|
 =======================================
 
-Abstract Acdemic Data Base(ADB) tools class
+# Abstract Acdemic Data Base(ADB) tools class
 """
 
 

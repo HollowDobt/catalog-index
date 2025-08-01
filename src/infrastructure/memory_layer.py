@@ -3,7 +3,7 @@
 |src/infrastructure/mem0_client.py|
 ===================================
 
-Simple encapsulation of requests to mem0 servers, 
+# Simple encapsulation of requests to mem0 servers, 
 """
 
 
