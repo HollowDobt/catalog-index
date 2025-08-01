@@ -23,8 +23,6 @@ import os
 import uuid
 import time
 
-import config
-
 from mem0 import Memory, MemoryClient
 
 
