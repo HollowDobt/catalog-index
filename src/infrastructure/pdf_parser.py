@@ -10,7 +10,7 @@ import os
 import pymupdf
 
 from dataclasses import dataclass
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Tuple
 
 
 class PDFPathError(RuntimeError):
@@ -54,11 +54,11 @@ class PDFParser:
             raise PDFPathError(f"Failed to open PDF file: {exc}")
         
         
-    def parse(self):
+    def parse(self) -> List[Dict[str, Any]]:
         """
         Parse all pages of a PDF file and extract text blocks, image blocks, and table blocks
         """
-        all_blocks = []
+        all_blocks: List[Dict[str, Any]] = []
         assert self.doc , "doc initialite required"
         for page_index in range(len(self.doc)):
             page = self.doc[page_index]
@@ -66,13 +66,19 @@ class PDFParser:
             
             # 1, Detect all tables on the current page and extract their content and borders
             tables = page.find_tables()
-            table_blocks = []           # Table block content record
-            table_regions = []          # Table block location record
+            table_blocks: List[Dict[str, Any]] = []           # Table block content record
+            table_regions: List[Tuple[float, float, float, float]] = []          # Table block location record
             
-            if tables and getattr(tables, "tables", tables):
+            if tables:
                 for table in tables:
-                    bbox = table.bbox
-                    table_regions.append(bbox)
+                    bbox = table.bbox # class -> fitz.Rect
+                    
+                    if hasattr(bbox, "x0"):
+                        bbox_tuple = (bbox.x0, bbox.y0, bbox.x1, bbox.y1)
+                    else:
+                        bbox_tuple = tuple(bbox)
+
+                    table_regions.append(bbox_tuple)
                     
                     table_blocks.append({
                         "page": page_number,
@@ -82,30 +88,27 @@ class PDFParser:
                     })
                     
             # 2, Extract text blocks (skip text within table areas)
-            page_dict = page.get_text("dict", sort=True)
+            page_dict = page.get_text(option="dict", sort=True)
             dict_blocks = page_dict.get("blocks", [])
             
-            img_xref_map = {
-                idx: info[0] for idx, info in enumerate(page.get_images(full=True))
-            }
-            
-            text_blocks: list[dict] = []
-            image_blocks: list[dict] = []
+            text_blocks: List[Dict[str, Any]] = []
+            image_blocks: List[Dict[str, Any]] = []
 
             for blk in dict_blocks:
                 btype = blk.get("type")
                 x0, y0, x1, y1 = blk["bbox"]
 
                 if btype == 0: 
-                    text = ""
-                    for line in blk.get("lines", []):
-                        for span in line.get("spans", []):
-                            text += span.get("text", "")
-                        text += "\n"
-                    text = text.strip()
+                    # Concatenate text strings
+                    text = "".join(
+                        span.get("text", "")
+                        for line in blk.get("lines", [])
+                        for span in line.get("spans", [])
+                    ).strip()
                     if not text:
                         continue
                     
+                    # Skip table area
                     if any(x0 >= bx0 and y0 >= by0 and x1 <= bx1 and y1 <= by1
                         for bx0, by0, bx1, by1 in table_regions):
                         continue
@@ -121,6 +124,7 @@ class PDFParser:
                     xref = blk.get("xref", 0)
                     if not xref:
                         continue
+                    
                     try:
                         img_dict = self.doc.extract_image(xref)
                     except Exception:
@@ -140,24 +144,25 @@ class PDFParser:
         return all_blocks
     
     
-    def parse_and_merge(self):
+    def parse_and_merge(self) -> List[Dict[str, Any]]:
         """
         Call self.parse() to get the original list of blocks, 
         then merge consecutive 'text' blocks into a new 'paragraph' block in order 
         and insert it at the same position (preserving the original order).
         """
-        raw_blocks = self.parse()
-        merged_blocks = []
+        raw_blocks: List[Dict[str, Any]] = self.parse()
+        merged_blocks: List[Dict[str, Any]] = []
         
-        buffer = []
+        buffer: List[Dict[str, Any]] = []
         
-        def _flush():
+        def _flush() -> None:
             """
             Merge the stored text blocks into paragraphs and push them into merged_blocks.
             """
             if not buffer:
                 return
             paragraph = " ".join(b["content"].strip() for b in buffer).strip()
+            # Compute bounding box that covers all buffered blocks
             x0 = min(b["bbox"][0] for b in buffer)
             y0 = min(b["bbox"][1] for b in buffer)
             x1 = max(b["bbox"][2] for b in buffer)
@@ -176,8 +181,8 @@ class PDFParser:
             else:
                 _flush()
                 merged_blocks.append(blk)
-        _flush()
         
+        _flush()
         return merged_blocks
     
     
