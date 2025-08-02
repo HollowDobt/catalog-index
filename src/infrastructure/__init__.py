@@ -15,12 +15,14 @@ from typing import List
 from .llm_client import LLMClient # noqa: F401
 from .academicDB_client import AcademicDBClient # noqa: F401
 from .memory_layer import Mem0Client # noqa: F401
+from .pdf_parser import PDFParser # noqa: F401
 
 
 __all__: List[str] = [
     "LLMClient",
     "AcademicDBClient",
     "Mem0Client",
+    "PDFParser"
 ]
 
 

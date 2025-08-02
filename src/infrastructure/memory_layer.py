@@ -1,7 +1,7 @@
 """
-===================================
-|src/infrastructure/mem0_client.py|
-===================================
+====================================
+|src/infrastructure/memory_layer.py|
+====================================
 
 # Simple encapsulation of requests to mem0 servers, 
 """
