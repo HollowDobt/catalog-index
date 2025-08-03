@@ -91,7 +91,7 @@ class LLMClient(ABC):
         request: str
     ) -> str:
         """
-        Generate API requests to scientific databases upon request 
+        Generate API requests to scientific databases upon request
         """
         system_prompts="""
 # Role: ArXiv Academic Research API Expert
@@ -177,7 +177,7 @@ As an ArXiv Academic Research API Expert, you must follow the above rules and pe
         """
         message=[{"role":"system","content":system_prompts},
                  {"role":"user","content":user_prompts},]
-        response=self.chat_completion(message=message)
+        response=self.chat_completion(messages=message, model="deepseek-reasoner")
         return response['choices'][0]['message']['content']
     @abstractmethod
     def analyze(
@@ -262,6 +262,7 @@ As a Document Analysis Expert, you must adhere to the above Rules and follow the
         """
         response=self.chat_completion(
             messages=messages,
+            model="deepseek-reasoner"
         )
         return response['choices'][0]['message']['content']
     
@@ -348,5 +349,6 @@ As an Advanced Demand Analysis Specialist, you are required to strictly follow t
                   {"role":"user","content":user_prompt+"\narticle:"+article}]
         response=self.chat_completion(
             messages=messages,
+            model="deepseek-reasoner"
         )
         return response['choices'][0]['message']['content']
