@@ -1,12 +1,6 @@
-# Process Sketch
+# 计划草图
 
-## Alpha version plan
+## Alpha 测试版工作流
 ---
 
 ![[process.png]]
-
-类与函数接口定义表(伪代码)
-
-```Python
-class CliIO:
-```
