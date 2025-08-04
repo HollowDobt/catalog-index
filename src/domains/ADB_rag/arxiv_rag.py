@@ -121,7 +121,9 @@ class ArxivRAG(AcademicDBRAG):
         except Exception as exc:
             # Returns a simple query based on the original input as a fallback
             fallback_query = f"all:{user_input.replace(' ', '+')}"
-            return json.dumps([fallback_query])
+            ss = json.dumps([fallback_query])
+            ss = re.compile(r'\\"').sub('', ss)
+            return ss
     
     
     def _build_system_prompt(self) -> str:
