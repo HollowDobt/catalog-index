@@ -111,16 +111,13 @@ class ArxivClient(AcademicDBClient):
         if max_num <= 0:
             raise ValueError("Illegal parameters passed in, 'max_num' must be greater than 0.")
         
-        params = {
-            "search_query": query,
-            "max_results": max_num,
-        }
         assert self.base_url, "base_url required"
         assert self.end_point, "end_point required"
-        url = f"{self.base_url.rstrip("/")}/{self.end_point.lstrip("/")}"
+        url = f"{self.base_url.rstrip("/")}/{self.end_point.lstrip("/")}search_query={query}&max_results={max_num}"
+        print(url)
         
         try:
-            response = requests.get(url, params=params, timeout=self.time_out)
+            response = requests.get(url, timeout=self.time_out)
             if response.status_code // 100 != 2:
                 raise ArxivConnectError(f"[{response.status_code}] {response.text[:200]}")
             return self._parse_atom_response(xml_text=response.text)

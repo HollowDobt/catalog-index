@@ -4,15 +4,14 @@
 ==================================
 """
 
-
 import re
 import ast
 import json
 
-from typing import List, Dict, Any
+from typing import List, Any, Optional
 from domains.academicDB_rag import AcademicDBRAG
 from infrastructure import LLMClient
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 
 ALLOWED_CATEGORIES: set = {
@@ -56,10 +55,26 @@ ALLOWED_CATEGORIES: set = {
 # Allowed field prefixes for search_query (as per arXiv API documentation)
 ALLOWED_FIELD_PREFIXES: set = {'ti', 'au', 'abs', 'co', 'jr', 'cat', 'rn', 'all', 'id'}
 
+# Field prefix mapping
+FIELD_PREFIX_SYNONYMS = {
+    "title": "ti",
+    "author": "au", 
+    "authors": "au",
+    "abstract": "abs",
+    "comment": "co",
+    "comments": "co", 
+    "journal": "jr",
+    "category": "cat",
+    "categories": "cat",
+    "report": "rn",
+    "reportnumber": "rn",
+    "report-number": "rn"
+}
+
 
 class ArxivRAGIllegalFormatError(RuntimeError):
     """
-    Parsing the return value into an illegal format
+    Exception when parsing return value is in illegal format.
     """
 
 
@@ -67,29 +82,51 @@ class ArxivRAGIllegalFormatError(RuntimeError):
 @AcademicDBRAG.register("arxiv")
 class ArxivRAG(AcademicDBRAG):
     """
-    Convert user needs into search expressions
+    RAG class that converts user requirements into ArXiv search expressions.
     """
     LLM_client: LLMClient
-    
+
+
     def api_coding(self, request: str) -> str:
         """
-        Generate arXiv API search query strings for the given input text (keywords and key sentence).
-        
-        The input `request` is expected to contain some keywords and a key sentence (possibly separated by a comma).
-        This method will:
-          1. Use the Qwen LLM (via chat_completion) to generate a list of query strings following arXiv API syntax.
-          2. Validate and post-process the generated queries:
-             - Ensure only valid field prefixes are used (ti, au, abs, co, jr, cat, rn, all, id).
-             - Ensure any `cat:` field value is one of the allowed arXiv subject categories.
-             - Remove or correct any invalid parts of queries to strictly comply with arXiv API rules.
-          3. Return the final list of query strings as a JSON-formatted string (e.g., '["all:term+AND+ti:term2", "ti:\\"phrase\\"+OR+cat:cs.AI"]').
-        
-        Returns:
-            A JSON string representation of a list of query strings suitable for arXiv API `search_query` parameter.
+        Generates an ArXiv API search query string for a given input text.
         """
+        if not request or not request.strip():
+            return json.dumps([])
+
         user_input = request.strip()
         
-        system_prompt: str = (
+        # Build system prompt words
+        system_prompt = self._build_system_prompt()
+        user_prompt = f"Generate the arxiv search query: (user_input)[{user_input}]"
+        
+        messages = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt},
+        ]
+        
+        try:
+            # Call LLM to get the raw output
+            response = self.LLM_client.chat_completion(messages=messages)
+            content = response["choices"][0]["message"]["content"].strip()
+            
+            # Parsing LLM Response
+            queries = self._parse_llm_response(content)
+            
+            # Validating and cleaning queries
+            valid_queries = self._validate_and_clean_queries(queries)
+            
+            return json.dumps(valid_queries, ensure_ascii=False)
+            
+        except Exception as exc:
+            # Returns a simple query based on the original input as a fallback
+            fallback_query = f"all:{user_input.replace(' ', '+')}"
+            return json.dumps([fallback_query])
+    
+    
+    def _build_system_prompt(self) -> str:
+        """Build system prompt words"""
+        return (
             "You are an expert search query generator for the arXiv API. "
             "Given some keywords and a key sentence, output a Python list of search query strings that the arXiv API can use. "
             "Each string in the list must strictly follow arXiv API syntax:\n"
@@ -98,197 +135,189 @@ class ArxivRAG(AcademicDBRAG):
             "- If a search term has multiple words and should be treated as a phrase, put it in quotes (e.g., abs:\"machine learning\").\n"
             "- Only use valid arXiv category codes after 'cat:'. (For example, use 'cat:cs.AI' or 'cat:hep-th'. Do NOT invent new category names.)\n"
             "- If the input is not in English, translate or use English equivalents for the search terms, since arXiv papers are mostly in English.\n"
-            "- Output *only* the list of query strings, with no extra text. The list should be a valid Python array, e.g. [\"all:term+AND+ti:term2+OR+au:ankel\", \"cat:cs.AI\", ...]."
+            "- Output *only* the list of query strings, with no extra text. The list should be a valid Python array, e.g. ['all:term+AND+ti:term2+OR+au:author', 'cat:cs.AI', ...].\n"
         )
-        
-        user_prompt = f"Generate the arxiv search query: (user_input)[{user_input}]"
-        messages = [
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_prompt},
-        ]
-        
-        # Call the LLM to get the raw output
-        response = self.LLM_client.chat_completion(messages=messages)
-        content = response["choices"][0]["message"]["content"].strip()
-        
-        if content[:3] == "```":
+    
+    
+    def _parse_llm_response(self, content: str) -> List[str]:
+        """Parsing LLM response content"""
+        # Handling code block formatting
+        if content.startswith("```"):
             content = content.strip("`")
-            if content[:6] == "json\n":
-                content = content[len("json\n"):]
-            content = content.strip()
+            if content.startswith("json\n"):
+                content = content[5:].strip()
+            elif content.startswith("python\n"):
+                content = content[7:].strip()
         
-        queries: List[str]
         try:
+            # Try parsing directly
             queries = ast.literal_eval(content)
             if not isinstance(queries, list):
-                raise ValueError(f"Parsed content is not a list: {queries}")
-        except Exception as exc:
-            # If direct eval failed (maybe the model output extra text around the list),
-            # try to extract the list part
-            list_start = content.find("[")
-            list_end = content.rfind("]")
+                raise ArxivRAGIllegalFormatError(f"The parsed content is not a list: {queries}")
+            return queries
             
-            if list_start != -1 and list_end != -1 and list_end > list_start:
-                list_str = content[list_start:list_end+1]
+        except Exception:
+            # If direct parsing fails, try extracting the list part
+            return self._extract_list_from_content(content)
+    
+    
+    def _extract_list_from_content(self, content: str) -> List[str]:
+        """Extracting a list from content"""
+        list_start = content.find("[")
+        list_end = content.rfind("]")
+        
+        if list_start != -1 and list_end != -1 and list_end > list_start:
+            list_str = content[list_start:list_end+1]
+            try:
+                queries = ast.literal_eval(list_str)
+                if isinstance(queries, list):
+                    return queries
+            except Exception:
                 try:
-                    queries = ast.literal_eval(list_str)
-                    if not isinstance(queries, list):
-                        raise ArxivRAGIllegalFormatError(f"Parsing the return value into an illegal format: {queries}")
-                except:
-                    try:
-                        queries = json.loads(list_str)
-                    except Exception as exc:
-                        queries = [content.strip('" ')]
-                        
-            else:
-                queries = [content.strip('" ')] if content else []
-                
-        # Ensure all elements are strings (filter out any non-string just in case)
-        queries = [q for q in queries if isinstance(q, str)]
-        valid_queries: List[str] = []
-        for query in queries:
-            q = query.strip()
-            if not q:
-                continue
-            
-            # Replace common field prefix synonyms with correct abbreviations (if any)
-            # e.g., "title:" -> "ti:", "author:" -> "au:", "abstract:" -> "abs:", etc.
-            # We'll do a simple replacement on each segment separated by spaces or plus signs around the colon.
-            # We need to replace only at the start of each field segment.
-            # Split on the known operators to isolate field segments
-            segments = re.split(r'(\+ANDNOT\+|\+AND\+|\+OR\+)', q)
-            # segments will include operators as separate elements
-            new_segments: List[str] = []
-            invalid_structure = False
-            
-            for seg in segments:
-                if seg.upper() in ["+AND+", "+OR+", "+ANDNOT+"]:
-                    # No additional processing is required for "+AND+", "+OR+", and "+ANDNOT+"
-                    new_segments.append(seg.upper())
-                elif seg == "":
-                    continue
-                else:
-                    # This is a field segment like "ti:term" or "cat:code" or "abs:\"some phrase\""
-                    # Check and correct field prefix if needed
-                    part = seg
-                    if ":" in seg:
-                        prefix, rest = part.split(":", 1)
-                        prefix_lower = prefix.lower()
-                        
-                        synonym_map = {
-                            "title": "ti",
-                            "author": "au",
-                            "authors": "au",
-                            "abstract": "abs",
-                            "comment": "co",
-                            "comments": "co",
-                            "journal": "jr",
-                            "category": "cat",
-                            "categories": "cat",
-                            "report": "rn",
-                            "reportnumber": "rn",
-                            "report-number": "rn"
-                        }
-                        
-                        if prefix_lower in synonym_map:
-                            prefix = synonym_map[prefix_lower]
-                        
-                        # Use lowercase for standard prefixes (arxiv expects lowercase field tags)
-                        prefix = prefix.lower()
-                        part = prefix + ":" + rest
-
-                        if prefix not in ALLOWED_FIELD_PREFIXES:
-                            invalid_structure = True
-                            break
-                        
-                        new_segments.append(part)
-                
-            if invalid_structure:
-                continue
-                
-            q_reconstructed = "".join(new_segments)
-            
-            # Now validate category codes and remove invalid ones if present
-            # Split again by operators to isolate each condition
-            segments2 = re.split(r'(\+ANDNOT\+|\+AND\+|\+OR\+)', q_reconstructed)
-            
-            # Determine if there's a mix of AND/OR operators (for deciding removal strategy)
-            has_and = any(s.upper() == "+AND+" or s.upper() == "+ANDNOT+" for s in segments2)
-            has_or = any(s.upper() == "+OR+" for s in segments2)
-            mixed_ops = has_and and has_or
-            
-            # Identify and remove invalid cat segments
-            # We will build a new list of segments (third pass) excluding invalid category conditions.
-            final_segments: List[str] = []
-            skip_next_operator = False
-            
-            for idx, seg in enumerate(segments2):
-                
-                if seg.upper() in ["+AND+", "+OR+", "+ANDNOT+"]:
-                    # Decide later whether to include this operator or not, depending on adjacent removals
-                    # For now, don't append operators immediately; handle them when adding segments
-                    final_segments.append(seg.upper())
-                    continue
-                
-                if seg.strip() == "":
-                    continue
-                
-                # If this segment is a category filter
-                if seg.lower().startswith("cat:"):
-                    cat_value = seg[4:]
-                    if cat_value not in ALLOWED_CATEGORIES:
-                        # Invalid category code found
-                        if len(segments2) == 1:
-                            skip_next_operator = False
-                            final_segments = []
-                            break
-                        
-                        # If operators are mixed (AND/OR), it's safer to drop the whole query to avoid logic errors
-                        if mixed_ops:
-                            skip_next_operator = False
-                            final_segments = []
-                            invalid_structure = True
-                            break
-                        
-                        # If only one type of operator (pure AND chain or pure OR chain), we can remove this segment safely
-                        # Remove this category segment and the appropriate connecting operator.
-                        # We will skip adding this segment, and also handle adjacent operators below.
-                        # Mark to skip adding the next operator in final_segments (which is the operator after this segment if any).
-                        skip_next_operator = True
-                        
-                        # Remove the operator before this segment in final_segments (if present at end)
-                        if final_segments:
-                            prev = final_segments[-1]
-                            if prev.upper() in ["+AND+", "+OR+", "+ANDNOT+"]:
-                                final_segments.pop()  # remove the previous operator
-                        
-                        continue
-                    
-                    # If category is valid, keep the segment
-                    # (Also, if previously we marked to skip its operator, that was handled above by removing prev operator)
-                    final_segments.append(seg)
-                
-                else:
-                    # Not a category segment, keep it normally
-                    final_segments.append(seg)
-                
-                if skip_next_operator:
-                    # Skip the next operator in the loop by resetting the flag and ensure we don't double-add operators
-                    skip_next_operator = False
-                    # In the normal flow, the next loop iteration would append the next operator, but since we removed the segment,
-                    # we already popped the previous operator. We continue to next iteration which will find the next operator and handle normally.
-            if invalid_structure:
-                continue  # drop this query entirely due to structural issues
-            # After processing all segments, reconstruct query string
-            cleaned_query = "".join(final_segments)
-            cleaned_query = cleaned_query.strip('+ ')  # remove any leading/trailing '+' if any remain
-            if cleaned_query == "":
-                continue
-            # Finally, ensure the cleaned query is not a duplicate of one already added
-            if cleaned_query not in valid_queries:
+                    return json.loads(list_str)
+                except Exception:
+                    pass
+        
+        # The last backup plan
+        cleaned_content = content.strip('" ')
+        return [cleaned_content] if cleaned_content else []
+    
+    
+    def _validate_and_clean_queries(self, queries: List[Any]) -> List[str]:
+        """Validate and cleanse query lists"""
+        # Make sure all elements are strings
+        string_queries = [q for q in queries if isinstance(q, str) and q.strip()]
+        
+        valid_queries = []
+        for query in string_queries:
+            cleaned_query = self._clean_single_query(query.strip())
+            if cleaned_query and cleaned_query not in valid_queries:
                 valid_queries.append(cleaned_query)
-        # If no valid queries remain, we can optionally return an empty list or a broad search query as fallback.
-        # Here we return an empty list if nothing valid, else the filtered queries.
-        result_list = valid_queries if valid_queries else []
-        # Return the list as a JSON-formatted string
-        return json.dumps(result_list, ensure_ascii=False)
+        
+        return valid_queries
+    
+    
+    def _clean_single_query(self, query: str) -> Optional[str]:
+        """Cleans a single query string"""
+        if not query:
+            return None
+        
+        try:
+            # Standardize field prefixes
+            query = self._normalize_field_prefixes(query)
+            
+            # Validation field prefix
+            if not self._validate_field_prefixes(query):
+                return None
+            
+            # Clean up invalid category codes
+            query = self._clean_category_codes(query)
+            
+            # Clean up query format
+            query = query.strip('+ ')
+            
+            return query if query else None
+            
+        except Exception as e:
+            return None
+    
+    
+    def _normalize_field_prefixes(self, query: str) -> str:
+        """Standardize field prefixes"""
+        # Split the query to process individual parts
+        segments = re.split(r'(\+(?:AND|OR|ANDNOT)\+)', query, flags=re.IGNORECASE)
+        new_segments = []
+        
+        for seg in segments:
+            if re.match(r'^\+(?:AND|OR|ANDNOT)\+$', seg, re.IGNORECASE):
+                new_segments.append(seg.upper())
+            elif seg.strip():
+                new_segments.append(self._normalize_field_segment(seg))
+        
+        return "".join(new_segments)
+    
+    
+    def _normalize_field_segment(self, segment: str) -> str:
+        """Standardize a single field segment"""
+        if ":" not in segment:
+            return segment
+        
+        prefix, rest = segment.split(":", 1)
+        prefix_lower = prefix.lower()
+        
+        # Using synonym maps
+        if prefix_lower in FIELD_PREFIX_SYNONYMS:
+            prefix = FIELD_PREFIX_SYNONYMS[prefix_lower]
+        else:
+            prefix = prefix_lower
+        
+        return f"{prefix}:{rest}"
+    
+    
+    def _validate_field_prefixes(self, query: str) -> bool:
+        """Verify that the field prefix is valid"""
+        segments = re.split(r'\+(?:AND|OR|ANDNOT)\+', query, flags=re.IGNORECASE)
+        
+        for seg in segments:
+            seg = seg.strip()
+            if not seg:
+                continue
+                
+            if ":" in seg:
+                prefix = seg.split(":", 1)[0].lower()
+                if prefix not in ALLOWED_FIELD_PREFIXES:
+                    return False
+        
+        return True
+    
+    
+    def _clean_category_codes(self, query: str) -> str:
+        """Clean up invalid category codes"""
+        segments = re.split(r'(\+(?:AND|OR|ANDNOT)\+)', query, flags=re.IGNORECASE)
+        
+        # Check if there are mixed operators
+        operators = [s.upper() for s in segments if re.match(r'^\+(?:AND|OR|ANDNOT)\+$', s, re.IGNORECASE)]
+        has_and = any(op in ['+AND+', '+ANDNOT+'] for op in operators)
+        has_or = any(op == '+OR+' for op in operators)
+        mixed_ops = has_and and has_or
+        
+        # If there are mixed operators and there are invalid categories, abandon the entire query
+        if mixed_ops and self._has_invalid_category(segments):
+            return ""
+        
+        # Remove invalid category segments
+        valid_segments = []
+        skip_next_operator = False
+        
+        for i, seg in enumerate(segments):
+            if re.match(r'^\+(?:AND|OR|ANDNOT)\+$', seg, re.IGNORECASE):
+                if not skip_next_operator:
+                    valid_segments.append(seg.upper())
+                skip_next_operator = False
+            elif seg.strip():
+                if self._is_invalid_category_segment(seg):
+                    # Remove the previous operator (if present)
+                    if valid_segments and re.match(r'^\+(?:AND|OR|ANDNOT)\+$', valid_segments[-1]):
+                        valid_segments.pop()
+                    skip_next_operator = True
+                else:
+                    valid_segments.append(seg)
+        
+        return "".join(valid_segments)
+    
+    
+    def _has_invalid_category(self, segments: List[str]) -> bool:
+        """Check for invalid categories"""
+        for seg in segments:
+            if self._is_invalid_category_segment(seg):
+                return True
+        return False
+    
+    
+    def _is_invalid_category_segment(self, segment: str) -> bool:
+        """Checks if the segment is an invalid category segment"""
+        segment = segment.strip()
+        if segment.lower().startswith("cat:"):
+            cat_value = segment[4:]
+            return cat_value not in ALLOWED_CATEGORIES
+        return False
