@@ -52,7 +52,7 @@ class AcademicDBRAG(ABC):
     
     ### Required functions for subclasses
     @abstractmethod
-    def api_coding(self, request: str) -> List[str]:
+    def api_coding(self, request: str) -> str:
         """
         Generate arxiv API search query strings for the given input text (keywords and key sentence).
         """
