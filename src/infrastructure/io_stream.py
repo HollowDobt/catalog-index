@@ -1,9 +1,9 @@
 """
 ==================================
-|/src/infrastructure/LLMClient.py|
+|/src/infrastructure/io_stream.py|
 ==================================
 
-# Abstract academicDB_RAG tools class
+# Abstract IO Stream tools class
 """
 
 
@@ -11,48 +11,55 @@ from abc import ABC, abstractmethod
 from typing import Type, Dict, Any, List
 
 
-class AcademicDBRAG(ABC):
+class IOStream(ABC):
     """
     Abstract large model tools class
     """
     
-    _registry: Dict[str, Type["AcademicDBRAG"]] = {}
+    _registry: Dict[str, Type["IOStream"]] = {}
     
     
     ### Function used when instantiating the abstract base class
     @classmethod
-    def register(cls, name: str, **kwargs: Any):
+    def register(cls, name: str):
         """
-        Academic Database RAG registration function, 
+        Large model client registration function, 
         the return value is the decorator function
         
         Example:
-            @LLMClient.register("deepseek")
-            class DeepSeekClient(LLMClient):
+            @IOStream.register("deepseek")
+            class DeepSeekClient(IOStream):
                 ...
         """
-        def decorator(subcls: Type["AcademicDBRAG"]):
+        def decorator(subcls: Type["IOStream"]):
             if name in cls._registry:
-                raise KeyError(f"Academic RAG provider '{name}' cannot be registered again.")
+                raise KeyError(f"IOStream provider '{name}' cannot be registered again.")
             cls._registry[name] = subcls
             return subcls
         return decorator
     
     @classmethod
-    def create(cls, provider_name: str, **kwargs: Any) -> "AcademicDBRAG":
+    def create(cls, provider_name: str, **kwargs: Any) -> "IOStream":
         """
         Find the instantiation method of the corresponding subclass by name
         """
         subcls = cls._registry.get(provider_name)
         if subcls is None:
             valid = ", ".join(cls._registry.keys())
-            raise ValueError(f"Unknown LLMClient provider name '{provider_name}'. Available: {valid}")
+            raise ValueError(f"Unknown IOStream provider name '{provider_name}'. Available: {valid}")
         return subcls(**kwargs)
     
     
     ### Required functions for subclasses
     @abstractmethod
-    def api_coding(self, request: str) -> List[str]:
+    def input(self, query: str, **kwargs: Any) -> str:
         """
-        Generate arxiv API search query strings for the given input text (keywords and key sentence).
+        Standard IO input
+        """
+    
+    
+    @abstractmethod
+    def output(self, query: str, **kwargs: Any) -> Any:
+        """
+        Standard IO output
         """

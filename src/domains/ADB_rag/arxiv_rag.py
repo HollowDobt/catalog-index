@@ -140,6 +140,7 @@ class ArxivRAG(AcademicDBRAG):
             "- Only use valid arXiv category codes after 'cat:'. (For example, use 'cat:cs.AI' or 'cat:hep-th'. Do NOT invent new category names.)\n"
             "- If the input is not in English, translate or use English equivalents for the search terms, since arXiv papers are mostly in English.\n"
             "- Output *only* the list of query strings, with no extra text. The list should be a valid Python array, e.g. ['all:term+AND+ti:term2+OR+au:author', 'cat:cs.AI', ...].\n"
+            "- Do not combine all keywords with OR. e.g., ['all:term', 'ti:term2+OR+au:author'] is better than [all:term+OR+ti:term2+OR+au:author]. Butå the maximum number of elements in the list is 10."
         )
     
     
