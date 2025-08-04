@@ -45,6 +45,8 @@ class DeepSeekClient(LLMClient):
     
     # The request function "_headers" header is automatically generated in subsequent requests 
     # and does not need to be generated during initialization.
+    model: str
+    
     _headers: Dict[str, str] = field(default_factory=dict, init=False)
     _raw_timeout: str | None = os.getenv("TIME_OUT_LIMIT")
     
@@ -87,7 +89,7 @@ class DeepSeekClient(LLMClient):
                     {"role": "system", "content": "You are a ping test agent."},
                     {"role": "user", "content": "ping test"}
                 ],
-                model="deepseek-chat",
+                model=self.model,
                 temperature=0.0,
                 max_tokens=1,
                 user=str(uuid.uuid4())
@@ -125,14 +127,13 @@ class DeepSeekClient(LLMClient):
     def chat_completion(
         self,
         messages: List[Dict[str, str]], 
-        model: str, 
         **kwargs: Any
     ) -> Dict[str, Any]:
         """
         call LLM chat-completions, return Json dictionary
         """
         request = {
-            "model": model,
+            "model": self.model,
             "messages": messages,
             **kwargs,
         }
@@ -241,7 +242,7 @@ As an ArXiv Academic Research API Expert, you must follow the above rules and pe
         """
         message=[{"role":"system","content":system_prompts},
                  {"role":"user","content":user_prompts},]
-        response=self.chat_completion(messages=message, model="deepseek-reasoner")
+        response=self.chat_completion(messages=message)
         return response['choices'][0]['message']['content']
 
 
@@ -326,8 +327,7 @@ As a Document Analysis Expert, you must adhere to the above Rules and follow the
             
         """
         response=self.chat_completion(
-            messages=messages,
-            model="deepseek-reasoner"
+            messages=messages
         )
         return response['choices'][0]['message']['content']
     
@@ -414,7 +414,6 @@ As an Advanced Demand Analysis Specialist, you are required to strictly follow t
                   {"role":"user","content":user_prompt+"\narticle:"+article}]
         response=self.chat_completion(
             messages=messages,
-            model="deepseek-reasoner"
         )
         return response['choices'][0]['message']['content']
 
@@ -431,7 +430,6 @@ if __name__ == "__main__":
             {"role": "system", "content": "You are a helpful assistant."},
             {"role": "user", "content": "hello"},
         ],
-        model="deepseek-chat",
         max_tokens = 100,
     )
     

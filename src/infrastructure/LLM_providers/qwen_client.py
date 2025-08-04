@@ -29,7 +29,7 @@ class QwenInitConnectError(RuntimeError):
     """
     Failed to get 200 code when initialization.
     """
-    
+
 class QwenConnectError(RuntimeError):
     """
     Failed to get 200 code.
@@ -45,6 +45,8 @@ class QwenClient(LLMClient):
     
     # The request function "_headers" header is automatically generated in subsequent requests 
     # and does not need to be generated during initialization.
+    model: str
+    
     _headers: Dict[str, str] = field(default_factory=dict, init=False)
     _raw_timeout: str | None = os.getenv("TIME_OUT_LIMIT")
     
@@ -86,7 +88,6 @@ class QwenClient(LLMClient):
                     {"role": "system", "content": "You are a ping test agent."},
                     {"role": "user", "content": "ping test"}
                 ],
-                model="deepseek-chat",
                 temperature=0.0,
                 max_tokens=1,
                 user=str(uuid.uuid4())
@@ -94,7 +95,7 @@ class QwenClient(LLMClient):
             _response = response["choices"][0]["message"]["content"] #noqa: B018
         except Exception as exc:
             print("Qwen initalize error. This often happens when base_url, api, or end_point are incorrect.")
-            raise QwenInitConnectError("Unable to connect to DeepSeek server") from exc
+            raise QwenInitConnectError("Unable to connect to Qwen server") from exc
         
         
     def _post(
@@ -123,18 +124,14 @@ class QwenClient(LLMClient):
     def chat_completion(
         self,
         messages: List[Dict[str, str]], 
-        model: str, 
         **kwargs: Any
     ) -> Dict[str, Any]:
         """
         call LLM chat-completions, return Json dictionary
         """
         request = {
-            "model": model,
+            "model": self.model,
             "messages": messages,
             **kwargs,
         }
         return self._post(request=request)
-    
-    
-    
