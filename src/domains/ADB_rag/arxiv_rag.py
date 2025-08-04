@@ -87,12 +87,12 @@ class ArxivRAG(AcademicDBRAG):
     LLM_client: LLMClient
 
 
-    def api_coding(self, request: str) -> str:
+    def api_coding(self, request: str) -> List[str]:
         """
         Generates an ArXiv API search query string for a given input text.
         """
         if not request or not request.strip():
-            return json.dumps([])
+            return ast.literal_eval(json.dumps([]))
 
         user_input = request.strip()
         
@@ -116,14 +116,16 @@ class ArxivRAG(AcademicDBRAG):
             # Validating and cleaning queries
             valid_queries = self._validate_and_clean_queries(queries)
             
-            return json.dumps(valid_queries, ensure_ascii=False)
+            ss = json.dumps(valid_queries, ensure_ascii=False)
+            ss = re.compile(r'\\"').sub('', ss)
+            return ast.literal_eval(ss)
             
         except Exception as exc:
             # Returns a simple query based on the original input as a fallback
             fallback_query = f"all:{user_input.replace(' ', '+')}"
             ss = json.dumps([fallback_query])
             ss = re.compile(r'\\"').sub('', ss)
-            return ss
+            return ast.literal_eval(ss)
     
     
     def _build_system_prompt(self) -> str:
