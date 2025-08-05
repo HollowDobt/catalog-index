@@ -135,3 +135,23 @@ class QwenClient(LLMClient):
             **kwargs,
         }
         return self._post(request=request)
+    
+    def analyze(
+        self,
+        article: str,
+    ) -> str:
+        """
+        Analyze article
+        """
+        ...
+    
+    
+    def find_connect(
+        self,
+        article: str,
+        user_query: str
+    ) -> str:
+        """
+        Find Connect
+        """
+        ...

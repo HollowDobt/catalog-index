@@ -116,6 +116,28 @@ class Mem0Client:
         except Exception as exc: # noqa: BLE001
             raise Mem0ConnectError(f"add_memory Failed: {exc}") from exc
 
+
+    def search_metadata(self, metadata: str) -> List[Dict[str, Any]]:
+        """
+        Search by unique identification code
+        """
+        return self._client.search(
+            query="*",
+            version="v2",
+            filters={
+                "AND": [
+                    {
+                        "metadata": {
+                            "eq": {
+                                "id": f"metadata"
+                            }
+                        }
+                    }
+                ]
+            }
+        )
+
+
     def search(
         self,
         query: str,

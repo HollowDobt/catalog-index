@@ -83,3 +83,22 @@ class LLMClient(ABC):
         """
         Upload content and request large model reply
         """
+    
+    @abstractmethod
+    def analyze(
+        self,
+        article: str,
+    ) -> str:
+        """
+        Analyze article
+        """
+        
+    @abstractmethod
+    def find_connect(
+        self,
+        article: str,
+        user_query: str
+    ) -> str:
+        """
+        Find Connect
+        """

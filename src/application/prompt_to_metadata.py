@@ -17,7 +17,7 @@ def prompt_to_metadata(
         raw_message_process_llm_model: str,
         api_generate_llm: str,
         api_generate_llm_model: str
-    ) -> List[str]:
+    ):
     """
     From user input to output of scientific research database API code
     
@@ -44,4 +44,32 @@ def prompt_to_metadata(
     
     LLM_client_for_api_generate = LLMClient.create(api_generate_llm, model=api_generate_llm_model)
     API_RAG = AcademicDBRAG.create("arxiv", LLM_client=LLM_client_for_api_generate)
-    return API_RAG.api_coding(procsee1_message["choices"][0]["message"]["content"]+", "+add_message)
+    api_code = API_RAG.api_coding(procsee1_message["choices"][0]["message"]["content"]+", "+add_message)
+
+    metadata_client = AcademicDBClient.create("arxiv")
+    memory = Mem0Client()
+    
+    ans: List[str] = []
+    
+    for api_code_node in api_code:
+        metadata = metadata_client.search_get_metadata(query=api_code_node, max_num=2)
+        for meta in metadata:
+            ana_article_lst = memory.search_metadata(meta['id'])
+            if ana_article_lst:
+                ana_article = ana_article_lst[0]["memory"]
+            else:
+                raw_article = metadata_client.single_metadata_parser(meta)
+                ana_article = LLM_client_for_raw_message.analyze(raw_article)
+                memory.add_memory(
+                    messages=ana_article,
+                    metadata={
+                        "id": f"{meta['id']}"
+                    }
+                )
+                
+            ans.append(LLM_client_for_raw_message.find_connect(article=ana_article, user_query=raw_message))
+    
+    
+    for i in ans:
+        operate_interface.output(i)
+        operate_interface.output(" ")
