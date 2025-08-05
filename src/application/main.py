@@ -2,6 +2,7 @@
 =======================================
 |src/application/prompt_to_metadata.py|
 =======================================
+
 # This file integrates the entire process from user input to output of scientific research database API code. 
 # The internal function return value is a list of API access codes: List[str].
 """
@@ -10,11 +11,12 @@
 from dataclasses import dataclass
 from typing import List
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from infrastructure import *
+from domains import *
+
 import time
 import threading
 import queue
-from infrastructure import *
-from domains import *
 
 
 @dataclass
@@ -22,10 +24,6 @@ class ArxivRateLimiter:
     """
     ArXiv API rate limiter - strictly adheres to official documentation requirements
     """
-    # def __init__(self, min_interval=3.0):
-    #     self.min_interval = min_interval
-    #     self.last_request_time = 0
-    #     self.lock = threading.Lock()
     min_interval: int
     last_request_time = 0
     lock = threading.Lock()
