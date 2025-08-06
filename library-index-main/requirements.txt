@@ -1,0 +1,27 @@
+#  Core SDKs 
+requests>=2.32.0,<3.0
+openai>=1.33.0,<2.0
+mem0ai[graph]>=0.1.0,<0.2.0
+neo4j>=5.20.0,<6.0
+
+#  NLP 
+spacy>=3.8.0,<3.10
+tiktoken>=0.7.0,<0.8
+pyyaml>=6.0.0,<7.0
+pymupdf>=1.26.3,<2.0.0
+docling>=2.43.0,<3.0.0
+pymupdf4llm>=0.0.27,<0.1.0
+
+#  Web / API 
+fastapi>=0.111.0,<1.0
+uvicorn[standard]>=0.30.0,<1.0
+typer>=0.12.3,<1.0
+
+#  Utilities 
+python-dotenv>=1.0.1,<2.0
+pydantic>=2.8.0,<3.0
+tqdm>=4.66.4,<5.0
+
+#  Testing 
+pytest>=8.2.0,<9.0
+pytest-asyncio>=0.23.6,<1.0
