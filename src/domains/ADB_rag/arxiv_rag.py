@@ -137,10 +137,10 @@ class ArxivRAG(AcademicDBRAG):
             "- Use field prefixes like ti: (Title), au: (Author), abs: (Abstract), co: (Comment), jr: (Journal Reference), cat: (Category), rn: (Report Number), id: (ArXiv ID), all: (All fields).\n"
             "- Use Boolean operators AND, OR, ANDNOT (in all caps) to combine conditions. Use '+' in place of spaces in the query (as in URL encoding).\n"
             "- If a search term has multiple words and should be treated as a phrase, put it in quotes (e.g., abs:\"machine learning\").\n"
-            "- Only use valid arXiv category codes after 'cat:'. (For example, use 'cat:cs.AI' or 'cat:hep-th'. Do NOT invent new category names.)\n"
+            "- Only and must use valid arXiv category codes after 'cat:'. (For example, use 'cat:cs.AI' or 'cat:hep-th'. Do NOT invent new category names.)\n"
             "- If the input is not in English, translate or use English equivalents for the search terms, since arXiv papers are mostly in English.\n"
             "- Output *only* the list of query strings, with no extra text. The list should be a valid Python array, e.g. ['all:term+AND+ti:term2+OR+au:author', 'cat:cs.AI', ...].\n"
-            "- Do not combine all keywords with OR. e.g., ['all:term', 'ti:term2+OR+au:author'] is better than [all:term+OR+ti:term2+OR+au:author]. Butå the maximum number of elements in the list is 10."
+            "- Do not combine all keywords with OR. e.g., ['all:term', 'ti:term2+OR+au:author'] is better than [all:term+OR+ti:term2+OR+au:author]. But the maximum number of elements in the list is 10."
         )
     
     
