@@ -114,7 +114,6 @@ class ArxivClient(AcademicDBClient):
         assert self.base_url, "base_url required"
         assert self.end_point, "end_point required"
         url = f"{self.base_url.rstrip("/")}/{self.end_point.lstrip("/")}search_query={query}&max_results={max_num}"
-        print(url)
         
         try:
             response = requests.get(url, timeout=self.time_out)
