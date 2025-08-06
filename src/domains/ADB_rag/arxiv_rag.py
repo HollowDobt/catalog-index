@@ -89,7 +89,15 @@ class ArxivRAG(AcademicDBRAG):
 
     def api_coding(self, request: str) -> List[str]:
         """
-        Generates an ArXiv API search query string for a given input text.
+        Generate ArXiv API search query strings for the given input text.
+
+        params
+        ------
+        request: input text to be converted into query strings
+
+        return
+        ------
+        List of query strings formatted for the ArXiv API
         """
         if not request or not request.strip():
             return ast.literal_eval(json.dumps([]))
@@ -129,7 +137,13 @@ class ArxivRAG(AcademicDBRAG):
     
     
     def _build_system_prompt(self) -> str:
-        """Build system prompt words"""
+        """
+        Build system prompt words
+
+        return
+        ------
+        System prompt string used for query generation
+        """
         return (
             "You are an expert search query generator for the arXiv API. "
             "Given some keywords and a key sentence, output a Python list of search query strings that the arXiv API can use. "
@@ -145,7 +159,17 @@ class ArxivRAG(AcademicDBRAG):
     
     
     def _parse_llm_response(self, content: str) -> List[str]:
-        """Parsing LLM response content"""
+        """
+        Parse LLM response content.
+
+        params
+        ------
+        content: raw response text from the LLM
+
+        return
+        ------
+        List of query strings extracted from the response
+        """
         # Handling code block formatting
         if content.startswith("```"):
             content = content.strip("`")
@@ -167,7 +191,17 @@ class ArxivRAG(AcademicDBRAG):
     
     
     def _extract_list_from_content(self, content: str) -> List[str]:
-        """Extracting a list from content"""
+        """
+        Extract a list of queries from raw content.
+
+        params
+        ------
+        content: text containing a Python list representation
+
+        return
+        ------
+        Extracted list of query strings
+        """
         list_start = content.find("[")
         list_end = content.rfind("]")
         
@@ -189,7 +223,17 @@ class ArxivRAG(AcademicDBRAG):
     
     
     def _validate_and_clean_queries(self, queries: List[Any]) -> List[str]:
-        """Validate and cleanse query lists"""
+        """
+        Validate and cleanse query lists.
+
+        params
+        ------
+        queries: raw query strings returned by the LLM
+
+        return
+        ------
+        List of sanitized query strings
+        """
         # Make sure all elements are strings
         string_queries = [q for q in queries if isinstance(q, str) and q.strip()]
         
@@ -203,7 +247,17 @@ class ArxivRAG(AcademicDBRAG):
     
     
     def _clean_single_query(self, query: str) -> Optional[str]:
-        """Cleans a single query string"""
+        """
+        Clean a single query string.
+
+        params
+        ------
+        query: query string to be normalized and validated
+
+        return
+        ------
+        Cleaned query string or None if invalid
+        """
         if not query:
             return None
         
@@ -228,7 +282,17 @@ class ArxivRAG(AcademicDBRAG):
     
     
     def _normalize_field_prefixes(self, query: str) -> str:
-        """Standardize field prefixes"""
+        """
+        Standardize field prefixes within a query.
+
+        params
+        ------
+        query: query string containing field prefixes
+
+        return
+        ------
+        Query string with normalized prefixes
+        """
         # Split the query to process individual parts
         segments = re.split(r'(\+(?:AND|OR|ANDNOT)\+)', query, flags=re.IGNORECASE)
         new_segments = []
@@ -243,7 +307,17 @@ class ArxivRAG(AcademicDBRAG):
     
     
     def _normalize_field_segment(self, segment: str) -> str:
-        """Standardize a single field segment"""
+        """
+        Standardize a single field segment.
+
+        params
+        ------
+        segment: single segment of a query containing a field prefix
+
+        return
+        ------
+        Segment with normalized field prefix
+        """
         if ":" not in segment:
             return segment
         
@@ -260,7 +334,17 @@ class ArxivRAG(AcademicDBRAG):
     
     
     def _validate_field_prefixes(self, query: str) -> bool:
-        """Verify that the field prefix is valid"""
+        """
+        Verify that the field prefixes in a query are valid.
+
+        params
+        ------
+        query: query string to inspect
+
+        return
+        ------
+        True if all prefixes are allowed, otherwise False
+        """
         segments = re.split(r'\+(?:AND|OR|ANDNOT)\+', query, flags=re.IGNORECASE)
         
         for seg in segments:
@@ -277,7 +361,17 @@ class ArxivRAG(AcademicDBRAG):
     
     
     def _clean_category_codes(self, query: str) -> str:
-        """Clean up invalid category codes"""
+        """
+        Clean up invalid category codes in a query.
+
+        params
+        ------
+        query: query string containing category specifications
+
+        return
+        ------
+        Query string with invalid categories removed
+        """
         segments = re.split(r'(\+(?:AND|OR|ANDNOT)\+)', query, flags=re.IGNORECASE)
         
         # Check if there are mixed operators
@@ -312,7 +406,17 @@ class ArxivRAG(AcademicDBRAG):
     
     
     def _has_invalid_category(self, segments: List[str]) -> bool:
-        """Check for invalid categories"""
+        """
+        Check whether any query segment contains an invalid category.
+
+        params
+        ------
+        segments: list of query segments to evaluate
+
+        return
+        ------
+        True if an invalid category is found, otherwise False
+        """
         for seg in segments:
             if self._is_invalid_category_segment(seg):
                 return True
@@ -320,7 +424,17 @@ class ArxivRAG(AcademicDBRAG):
     
     
     def _is_invalid_category_segment(self, segment: str) -> bool:
-        """Checks if the segment is an invalid category segment"""
+        """
+        Determine whether a segment is an invalid category segment.
+
+        params
+        ------
+        segment: query segment to check
+
+        return
+        ------
+        True if the segment has an invalid category code, otherwise False
+        """
         segment = segment.strip()
         if segment.lower().startswith("cat:"):
             cat_value = segment[4:]

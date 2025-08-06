@@ -23,13 +23,15 @@ class LLMClient(ABC):
     @classmethod
     def register(cls, name: str):
         """
-        Large model client registration function, 
-        the return value is the decorator function
-        
-        Example:
-            @LLMClient.register("deepseek")
-            class DeepSeekClient(LLMClient):
-                ...
+        Register an LLMClient subclass under a provider name.
+
+        params
+        ------
+        name: provider name used for registration
+
+        return
+        ------
+        Decorator that registers the subclass
         """
         def decorator(subcls: Type["LLMClient"]):
             if name in cls._registry:
@@ -41,7 +43,16 @@ class LLMClient(ABC):
     @classmethod
     def create(cls, provider_name: str, **kwargs: Any) -> "LLMClient":
         """
-        Find the instantiation method of the corresponding subclass by name
+        Instantiate a registered LLMClient subclass by name.
+
+        params
+        ------
+        provider_name: name of the registered provider
+        **kwargs: parameters forwarded to the subclass constructor
+
+        return
+        ------
+        Instance of the specified LLMClient subclass
         """
         subcls = cls._registry.get(provider_name)
         if subcls is None:
@@ -58,9 +69,16 @@ class LLMClient(ABC):
         **kwargs: Any,
     ) -> Dict[str, Any]:
         """
-        Call LLMClient
-        
-        Return All Messages & Information
+        Call the LLM and return all messages and metadata.
+
+        params
+        ------
+        messages: conversation history for the model
+        **kwargs: additional request parameters
+
+        return
+        ------
+        JSON response from the LLM
         """
     
     
@@ -77,11 +95,19 @@ class LLMClient(ABC):
     
     @abstractmethod
     def _post(
-        self, 
+        self,
         request: Dict[str, Any]
     ) -> Dict[str, Any]:
         """
-        Upload content and request large model reply
+        Upload content and request a large model reply.
+
+        params
+        ------
+        request: payload sent to the API
+
+        return
+        ------
+        JSON response from the API
         """
     
     @abstractmethod
@@ -90,7 +116,15 @@ class LLMClient(ABC):
         article: str,
     ) -> str:
         """
-        Analyze article
+        Analyze article content.
+
+        params
+        ------
+        article: raw article content
+
+        return
+        ------
+        Structured text produced by the model
         """
         
     @abstractmethod
@@ -100,5 +134,14 @@ class LLMClient(ABC):
         user_query: str
     ) -> str:
         """
-        Find Connect
+        Find connections between an article and the user query.
+
+        params
+        ------
+        article: structured article content
+        user_query: user's research question
+
+        return
+        ------
+        Text describing the connections
         """

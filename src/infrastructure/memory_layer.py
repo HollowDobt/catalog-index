@@ -103,7 +103,18 @@ class Mem0Client:
         infer: Optional[bool] = False
     ) -> Dict[str, Any]:
         """
-        Write a memory (automatic drop graph & vector)
+        Write a memory (automatic drop graph & vector).
+
+        params
+        ------
+        messages: message content to store
+        metadata: metadata associated with the memory
+        user_id: identifier for the user
+        infer: whether to perform inference during storage
+
+        return
+        ------
+        Dictionary containing the server response
         """
         try:
             return self._client.add(
@@ -119,7 +130,15 @@ class Mem0Client:
 
     def search_metadata(self, metadata: str) -> List[Dict[str, Any]]:
         """
-        Search by unique identification code
+        Search for memories by unique identifier.
+
+        params
+        ------
+        metadata: unique identification code
+
+        return
+        ------
+        List of matching memory records
         """
         return self._client.search(
             query="*",
@@ -146,7 +165,17 @@ class Mem0Client:
         limit: int = 10,
     ) -> List[Dict[str, Any]]:
         """
-        Hybrid Search
+        Perform a hybrid search.
+
+        params
+        ------
+        query: search text
+        user_id: identifier for the user
+        limit: maximum number of results
+
+        return
+        ------
+        List of memory records matching the query
         """
         try:
             return self._client.search(
@@ -158,12 +187,34 @@ class Mem0Client:
             raise Mem0ConnectError(f"search failed: {exc}") from exc
 
     def delete_memory(self, memory_id: str) -> Dict[str, Any]:
+        """
+        Delete a memory by its ID.
+
+        params
+        ------
+        memory_id: identifier of the memory to remove
+
+        return
+        ------
+        Server response for the delete operation
+        """
         try:
             return self._client.delete(memory_id)
         except Exception as exc:  # noqa: BLE001
             raise Mem0ConnectError(f"delete failed: {exc}") from exc
 
     def delete_user_memories(self, user_id: str) -> None:
+        """
+        Delete all memories for a user.
+
+        params
+        ------
+        user_id: identifier of the user
+
+        return
+        ------
+        None
+        """
         try:
             self._client.delete_all(user_id=user_id)
         except Exception as exc:  # noqa: BLE001

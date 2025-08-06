@@ -23,13 +23,15 @@ class AcademicDBClient(ABC):
     @classmethod
     def register(cls, name: str):
         """
-        ADB client registration function,
-        the return value is the decorator function
-        
-        Example:
-            @AcademicDBClient("arxiv")
-            class ArxivClient(AcademicDBClient):
-                ...
+        Register an AcademicDBClient subclass under a provider name.
+
+        params
+        ------
+        name: provider name used for registration
+
+        return
+        ------
+        Decorator that registers the subclass
         """
         def decorator(subcls: Type["AcademicDBClient"]):
             if name in cls._registry:
@@ -41,7 +43,16 @@ class AcademicDBClient(ABC):
     @classmethod
     def create(cls, provider_name: str, **kwargs: Any) -> "AcademicDBClient":
         """
-        Find the instantiation method of the corresponding subclass by name
+        Instantiate a registered AcademicDBClient subclass by name.
+
+        params
+        ------
+        provider_name: name of the registered provider
+        **kwargs: parameters forwarded to the subclass constructor
+
+        return
+        ------
+        Instance of the specified AcademicDBClient subclass
         """
         subcls = cls._registry.get(provider_name)
         if subcls is None:
@@ -54,8 +65,16 @@ class AcademicDBClient(ABC):
     @abstractmethod
     def search_get_metadata(self, query: str, max_num: int) -> List[Dict[str, Any]]:
         """
-        Get metadata from AcademicDB API through Regular expression search.
-        This function will return a list of metadata which meet requirements.
+        Get metadata from the AcademicDB API.
+
+        params
+        ------
+        query: regular expression search query
+        max_num: maximum number of results to return
+
+        return
+        ------
+        List of metadata records matching the query
         """
     
     
@@ -63,6 +82,14 @@ class AcademicDBClient(ABC):
     def single_metadata_parser(self, meta_data: Dict[str, Any]) -> str:
         """
         Get a single article through metadata.
+
+        params
+        ------
+        meta_data: metadata describing the paper
+
+        return
+        ------
+        Content of the article
         """
     
     
@@ -76,5 +103,13 @@ class AcademicDBClient(ABC):
     @abstractmethod
     def multi_metadata_parser(self, meta_data_list: List[Dict[str, Any]]) -> List[str]:
         """
-        Get a lot of articles through metadata.
+        Get multiple articles through metadata.
+
+        params
+        ------
+        meta_data_list: list of metadata records
+
+        return
+        ------
+        List of article contents
         """

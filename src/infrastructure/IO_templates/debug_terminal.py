@@ -20,19 +20,40 @@ load_dotenv(DOT_ENV_PATH_PUBLIC)
 
 
 @dataclass
-@IOStream.register("debug")
-class DebugTerminalIO(IOStream):
-    """
-    IO utils based on terminal
-    Only in debug time
-    """
-    
+    @IOStream.register("debug")
+    class DebugTerminalIO(IOStream):
+        """
+        IO utils based on terminal
+        Only in debug time
+        """
+
     def input(self, query: str, **kwargs) -> str:
+        """
+        Read input from the terminal.
+
+        params
+        ------
+        query: prompt displayed to the user
+        **kwargs: additional parameters
+
+        return
+        ------
+        User-provided string
+        """
         return input(query)
-    
+
     def output(self, query: str, **kwargs: Any) -> Any:
         """
-        Save the file to the cache directory
+        Save text to the cache directory.
+
+        params
+        ------
+        query: text to save
+        **kwargs: additional parameters
+
+        return
+        ------
+        None
         """
         cache_root = Path(os.getenv("XDG_CACHE_HOME", Path.home() / ".cache"))
         target_dir = cache_root / "library-index" / "results"

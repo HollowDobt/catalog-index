@@ -105,8 +105,16 @@ class ArxivClient(AcademicDBClient):
     
     def search_get_metadata(self, query: str, max_num: int) -> List[Dict[str, Any]]:
         """
-        Get metadata of hte list of articles.
-        Query is Official API access expression, e.g.: all:electron+AND+cat:cs.LG
+        Get metadata for a list of articles.
+
+        params
+        ------
+        query: official arXiv API search expression
+        max_num: maximum number of results to retrieve
+
+        return
+        ------
+        List of metadata dictionaries
         """
         if max_num <= 0:
             raise ValueError("Illegal parameters passed in, 'max_num' must be greater than 0.")
@@ -127,7 +135,15 @@ class ArxivClient(AcademicDBClient):
         
     def _parse_atom_response(self, xml_text: str) -> List[Dict[str, Any]]:
         """
-        Parse xml fields into json
+        Parse XML fields into JSON structures.
+
+        params
+        ------
+        xml_text: XML response text from arXiv
+
+        return
+        ------
+        List of metadata dictionaries parsed from the XML
         """
         NS = {
             "atom": "http://www.w3.org/2005/Atom",
@@ -211,8 +227,15 @@ class ArxivClient(AcademicDBClient):
     
     def single_metadata_parser(self, meta_data: Dict[str, Any]) -> str:
         """
-        Download the PDF associated with a single metadata record and store it
-        under the system cache directory ``<cache>/library-index/download-files``.
+        Download the PDF associated with a metadata record.
+
+        params
+        ------
+        meta_data: metadata describing the paper
+
+        return
+        ------
+        Path to the downloaded PDF file
         """
         
         # Locate PDF URL
@@ -266,7 +289,15 @@ class ArxivClient(AcademicDBClient):
     
     def multi_metadata_parser(self, meta_data_list: List[Dict[str, Any]]) -> List[str]:
         """
-        From search_get_metadata download pdf files.
+        Download multiple PDFs based on metadata list.
+
+        params
+        ------
+        meta_data_list: list of metadata records
+
+        return
+        ------
+        List of paths to downloaded PDF files
         """
         download_paths: List[str] = []
         

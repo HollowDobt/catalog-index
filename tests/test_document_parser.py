@@ -6,6 +6,18 @@ from infrastructure.document_parsers import DocumentParser
 
 class DummyLLM:
     def chat_completion(self, *args, **kwargs):
+        """
+        Mock chat completion method.
+
+        params
+        ------
+        *args: positional arguments passed to the call
+        **kwargs: keyword arguments passed to the call
+
+        return
+        ------
+        Dictionary mimicking an LLM response
+        """
         data = [
             {"term": "Alpha", "definition": "A term", "synonyms": ["A"]}
         ]

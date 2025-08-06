@@ -23,13 +23,16 @@ class AcademicDBRAG(ABC):
     @classmethod
     def register(cls, name: str, **kwargs: Any):
         """
-        Academic Database RAG registration function, 
-        the return value is the decorator function
-        
-        Example:
-            @LLMClient.register("deepseek")
-            class DeepSeekClient(LLMClient):
-                ...
+        Register an AcademicDBRAG subclass under a provider name.
+
+        params
+        ------
+        name: provider name used for registration
+        **kwargs: extra parameters passed to the subclass
+
+        return
+        ------
+        Decorator that registers the subclass
         """
         def decorator(subcls: Type["AcademicDBRAG"]):
             if name in cls._registry:
@@ -41,7 +44,16 @@ class AcademicDBRAG(ABC):
     @classmethod
     def create(cls, provider_name: str, **kwargs: Any) -> "AcademicDBRAG":
         """
-        Find the instantiation method of the corresponding subclass by name
+        Instantiate a registered AcademicDBRAG subclass by name.
+
+        params
+        ------
+        provider_name: name of the registered provider
+        **kwargs: parameters forwarded to the subclass constructor
+
+        return
+        ------
+        Instance of the specified AcademicDBRAG subclass
         """
         subcls = cls._registry.get(provider_name)
         if subcls is None:
@@ -54,5 +66,14 @@ class AcademicDBRAG(ABC):
     @abstractmethod
     def api_coding(self, request: str) -> List[str]:
         """
-        Generate arxiv API search query strings for the given input text (keywords and key sentence).
+        Generate arXiv API search query strings for given input text.
+
+        params
+        ------
+        request: keywords and key sentence from the user
+
+        return
+        ------
+        List of query strings compatible with the ArXiv API
         """
+

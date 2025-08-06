@@ -103,7 +103,15 @@ class QwenClient(LLMClient):
         request: Dict[str, Any]
     ) -> Dict[str, Any]:
         """
-        Post request to Qwen Client
+        Send a POST request to the Qwen API.
+
+        params
+        ------
+        request: payload sent to the API
+
+        return
+        ------
+        JSON response from the API
         """
         assert self.base_url, "base_url required"
         assert self.end_point, "end_point required"
@@ -123,11 +131,20 @@ class QwenClient(LLMClient):
     
     def chat_completion(
         self,
-        messages: List[Dict[str, str]], 
+        messages: List[Dict[str, str]],
         **kwargs: Any
     ) -> Dict[str, Any]:
         """
-        call LLM chat-completions, return Json dictionary
+        Call the LLM chat-completions endpoint.
+
+        params
+        ------
+        messages: conversation history for the model
+        **kwargs: additional request parameters
+
+        return
+        ------
+        JSON response from the model
         """
         request = {
             "model": self.model,
@@ -141,7 +158,15 @@ class QwenClient(LLMClient):
         article: str,
     ) -> str:
         """
-        Analyze article
+        Analyze article content.
+
+        params
+        ------
+        article: raw article text
+
+        return
+        ------
+        Structured text produced by the model
         """
         ...
     
@@ -152,7 +177,16 @@ class QwenClient(LLMClient):
         user_query: str
     ) -> str:
         """
-        Find Connect
+        Find connections between an article and the user query.
+
+        params
+        ------
+        article: structured article content
+        user_query: user's research question
+
+        return
+        ------
+        Text describing the connections
         """
         system_prompt="""
 # Role: Advanced Demand Analysis Specialist
