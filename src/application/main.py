@@ -272,9 +272,8 @@ def main(
         print(f"Number of total generation results: **{len(ans)}**")
         
         # Output all results
-        for result in ans:
-            operate_interface.output(result)
-            operate_interface.output(" ")
+        ss = "\n".join(ans)
+        operate_interface.output(ss)
         
         return 0
             
