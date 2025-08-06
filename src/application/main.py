@@ -1,10 +1,10 @@
 """
-=======================================
-|src/application/prompt_to_metadata.py|
-=======================================
+=========================
+|src/application/main.py|
+=========================
 
-# This file integrates the entire process from user input to output of scientific research database API code. 
-# The internal function return value is a list of API access codes: List[str].
+# Main Function
+# From user's question to user's answer
 """
 
 
@@ -19,6 +19,7 @@ import threading
 import queue
 
 
+# Dot Timer
 @dataclass
 class ArxivRateLimiter:
     """
@@ -30,7 +31,7 @@ class ArxivRateLimiter:
     
     def wait_if_needed(self):
         """
-        Ensure that the request interval is >= 3 seconds
+        Ensure that the request interval >= 3 seconds
         """
         with self.lock:
             
@@ -60,6 +61,9 @@ def process_raw_article_with_llm(
     Can be executed concurrently. Speed depends on the service provider
     """
     try:
+        
+        # TODO 通过地址处理解析函数得到 markdown string
+        
         # Analytical Articles
         ana_article = LLM_client_for_raw_message.analyze(raw_article)
         

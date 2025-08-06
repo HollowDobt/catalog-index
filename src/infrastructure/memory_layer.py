@@ -129,7 +129,7 @@ class Mem0Client:
                     {
                         "metadata": {
                             "eq": {
-                                "id": f"metadata"
+                                "id": f"{metadata}"
                             }
                         }
                     }

@@ -1,0 +1,296 @@
+"""
+=======================================
+|src/infrastructure|pdf_parser_beta.py|
+=======================================
+
+# PDF Parser Class
+"""
+
+import re
+from pathlib import Path
+from dataclasses import dataclass
+from typing import List, Optional
+import logging
+
+# Import Docling library related modules
+from docling.document_converter import DocumentConverter, PdfFormatOption
+from docling.datamodel.pipeline_options import PdfPipelineOptions
+from docling.datamodel.base_models import InputFormat
+from docling_core.types.doc.base import ImageRefMode
+from docling_core.types.doc.document import PictureItem
+import pymupdf4llm
+
+
+# Configuring Logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+
+@dataclass
+class PDFConverterConfig:
+    """
+    PDF Converter Configuration Class
+    """
+    image_scale: float = 2.0
+    generate_page_images: bool = True
+    image_ref_mode: ImageRefMode = ImageRefMode.EMBEDDED
+    preserve_alt_text: bool = True
+    
+    def __post_init__(self):
+        """
+        Verify configuration parameters
+        """
+        if self.image_scale <= 0:
+            raise ValueError("Error: value **image_scale** must > 0")
+
+
+@dataclass
+class ConversionResult:
+    """
+    Conversion result data class
+    
+    # Used to store conversion results
+    """
+    markdown_text: str
+    image_count: int
+    file_path: Path
+    success: bool = True
+    error_message: Optional[str] = None
+    
+    @property
+    def has_images(self) -> bool:
+        """
+        Whether to include pictures
+        """
+        return self.image_count > 0
+
+
+@dataclass
+class ImageInfo:
+    """
+    Image information data class
+    """
+    markdown_content: str
+    alt_text: str = ""
+    data_uri: str = ""
+    
+    def __post_init__(self):
+        """
+        Extracting data URIs from markdown content
+        """
+        if self.markdown_content:
+            match = re.match(r'!\[.*?\]\((.*?)\)', self.markdown_content)
+            if match:
+                self.data_uri = match.group(1)
+
+
+class PDFToMarkdownConverter:
+    """
+    Convert PDF to Markdown string using Docling
+    """
+    
+    def __init__(self, config: Optional[PDFConverterConfig] = None):
+        """
+        Initialize the converter
+        
+        params
+        ------
+        config: Converter configuration, if None, use the default configuration
+        """
+        self.config = config or PDFConverterConfig()
+        self.converter = self._create_converter()
+    
+    def _create_converter(self) -> DocumentConverter:
+        """
+        Creating a Document Converter
+        """
+        pipeline_opts = PdfPipelineOptions()
+        pipeline_opts.images_scale = self.config.image_scale
+        pipeline_opts.generate_page_images = self.config.generate_page_images
+        
+        return DocumentConverter(
+            format_options={
+                InputFormat.PDF: PdfFormatOption(pipeline_options=pipeline_opts)
+            }
+        )
+    
+    def _extract_images(self, doc) -> List[ImageInfo]:
+        """
+        Extract image information from documents
+        
+        params
+        ------
+        doc: Docling document
+            
+        return
+        ------
+        Picture information list
+        """
+        images = []
+        
+        for item, *level in doc.iterate_items():
+            if isinstance(item, PictureItem):
+                try:
+                    img_md = item.export_to_markdown(
+                        doc, 
+                        image_mode=self.config.image_ref_mode
+                    )
+                    images.append(ImageInfo(markdown_content=img_md.strip()))
+                except Exception as exc:
+                    logger.warning(f"Failed to extract image: {exc}")
+                    continue
+        
+        logger.info(f"Number of images successfully extracted: {len(images)}")
+        return images
+    
+    def _replace_images(self, md_text: str, images: List[ImageInfo]) -> str:
+        """
+        Replace image references in Markdown text
+        
+        params
+        ------
+        md_text: Original Markdown text
+        images: Picture information list
+            
+        return
+        ------
+        Markdown text after replacement
+        """
+        image_iter = iter(images)
+        
+        def replace_image(match: re.Match) -> str:
+            original_alt_text = match.group(1)
+            
+            try:
+                image_info = next(image_iter)
+                if self.config.preserve_alt_text and original_alt_text:
+                    return f"![{original_alt_text}]({image_info.data_uri})"
+                else:
+                    return image_info.markdown_content
+            except StopIteration:
+                logger.warning("The number of pictures does not match, keep the original reference")
+                return match.group(0)
+        
+        return re.sub(r'!\[(.*?)\]\((.*?)\)', replace_image, md_text)
+    
+    def convert(self, pdf_path: str) -> ConversionResult:
+        """
+        Convert PDF files to Markdown format
+        
+        params
+        ------
+        pdf_path: PDF file path
+            
+        return
+        ------
+        Conversion result object
+        """
+        file_path = Path(pdf_path)
+        
+        # Verify Documents
+        if not file_path.exists():
+            return ConversionResult(
+                markdown_text="",
+                image_count=0,
+                file_path=file_path,
+                success=False,
+                error_message=f"File does not exist: {pdf_path}"
+            )
+        
+        if file_path.suffix.lower() != '.pdf':
+            return ConversionResult(
+                markdown_text="",
+                image_count=0,
+                file_path=file_path,
+                success=False,
+                error_message=f"Not a PDF file: {pdf_path}"
+            )
+        
+        try:
+            logger.info(f"Start converting PDF: {pdf_path}")
+            
+            # 1 Parsing PDF using Docling
+            result = self.converter.convert(file_path)
+            doc = result.document
+            
+            # 2 Generate Markdown using PyMuPDF4LLM
+            md_text = pymupdf4llm.to_markdown(str(file_path))
+            
+            # 3. Extract images
+            images = self._extract_images(doc)
+            
+            # 4. Replace image reference
+            if images:
+                md_text = self._replace_images(md_text, images)
+            
+            logger.info(f"Conversion completed, including the number of pictures: {len(images)}")
+            
+            return ConversionResult(
+                markdown_text=md_text,
+                image_count=len(images),
+                file_path=file_path,
+                success=True
+            )
+            
+        except Exception as exc:
+            error_msg = f"Conversion failed: {str(exc)}"
+            logger.error(error_msg)
+            
+            return ConversionResult(
+                markdown_text="",
+                image_count=0,
+                file_path=file_path,
+                success=False,
+                error_message=error_msg
+            )
+    
+    def convert_batch(self, pdf_paths: List[str]) -> List[ConversionResult]:
+        """
+        批量转换PDF文件
+        
+        Args:
+            pdf_paths: PDF文件路径列表
+            
+        Returns:
+            转换结果列表
+        """
+        results = []
+        
+        for pdf_path in pdf_paths:
+            result = self.convert(pdf_path)
+            results.append(result)
+            
+            if result.success:
+                logger.info(f"✓ {pdf_path}")
+            else:
+                logger.error(f"✗ {pdf_path}: {result.error_message}")
+        
+        return results
+
+
+# 使用示例
+if __name__ == "__main__":
+    # 基础使用
+    converter = PDFToMarkdownConverter()
+    result = converter.convert("example.pdf")
+    
+    if result.success:
+        print(f"转换成功！包含 {result.image_count} 张图片")
+        print(result.markdown_text[:500])  # 打印前500字符
+    else:
+        print(f"转换失败: {result.error_message}")
+    
+    # 自定义配置
+    config = PDFConverterConfig(
+        image_scale=3.0,
+        generate_page_images=True,
+        preserve_alt_text=False
+    )
+    custom_converter = PDFToMarkdownConverter(config)
+    
+    # 批量转换
+    pdf_files = ["file1.pdf", "file2.pdf", "file3.pdf"]
+    batch_results = converter.convert_batch(pdf_files)
+    
+    successful_conversions = [r for r in batch_results if r.success]
+    print(f"成功转换 {len(successful_conversions)}/{len(batch_results)} 个文件")
