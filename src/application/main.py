@@ -53,6 +53,7 @@ def process_raw_article_with_llm(
     meta_id: str, 
     memory: Mem0Client, 
     LLM_client_for_raw_message: LLMClient, 
+    LLM_client_for_embedding: LLMClient,
     raw_message: str, 
     result_queue: queue.Queue,
     raw_article_parse: PDFToMarkdownConverter
@@ -73,7 +74,7 @@ def process_raw_article_with_llm(
         )
         
         # Find Connections
-        result = LLM_client_for_raw_message.find_connect(
+        result = LLM_client_for_embedding.find_connect(
             article=ana_article, 
             user_query=raw_message
         )
@@ -93,6 +94,8 @@ def main(
         raw_message_process_llm_model: str,
         api_generate_llm: str,
         api_generate_llm_model: str,
+        embedding_llm: str,
+        embedding_llm_model: str,
         max_workers_llm=8,   # Maximum number of threads for large model processing
         max_search_retries=2
     ) -> int:
@@ -133,6 +136,7 @@ def main(
     metadata_client = AcademicDBClient.create("arxiv")
     memory = Mem0Client()
     raw_article_parse = PDFToMarkdownConverter()
+    embedding_client = LLMClient.create(embedding_llm, model=embedding_llm_model)
     
     print(f"Start processing NUMBER = **{len(api_code)}** API code nodes...")
     
@@ -208,6 +212,7 @@ def main(
                                 meta['id'],
                                 memory,
                                 LLM_client_for_raw_message,
+                                embedding_client,
                                 raw_message,
                                 result_queue,
                                 raw_article_parse
@@ -257,6 +262,7 @@ def main(
                     print(f"\nRegenerated **{len(api_code)}** API query nodes")
                 else:
                     print(f"\n✗ The maximum number of retries has been reached ({max_search_retries}), No suitable papers were found.")
+        
         # Wait for all large model processing tasks to complete
         print(f"\nWait for all large model processing tasks to complete...")
         llm_executor.shutdown(wait=True)
