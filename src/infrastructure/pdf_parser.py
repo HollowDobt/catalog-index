@@ -60,7 +60,11 @@ class ConversionResult:
     @property
     def has_images(self) -> bool:
         """
-        Whether to include pictures
+        Check whether the result includes any images.
+
+        return
+        ------
+        True if at least one image is present
         """
         return self.image_count > 0
 
@@ -102,7 +106,11 @@ class PDFToMarkdownConverter:
     
     def _create_converter(self) -> DocumentConverter:
         """
-        Creating a Document Converter
+        Create the document converter instance.
+
+        return
+        ------
+        Configured DocumentConverter object
         """
         pipeline_opts = PdfPipelineOptions()
         pipeline_opts.images_scale = self.config.image_scale

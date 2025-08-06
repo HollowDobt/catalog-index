@@ -105,7 +105,15 @@ class DeepSeekClient(LLMClient):
         request: Dict[str, Any]
     ) -> Dict[str, Any]:
         """
-        Post request to DeepSeek Client
+        Send a POST request to the DeepSeek API.
+
+        params
+        ------
+        request: payload sent to the API
+
+        return
+        ------
+        JSON response from the API
         """
         assert self.base_url, "base_url required"
         assert self.end_point, "end_point required"
@@ -126,11 +134,20 @@ class DeepSeekClient(LLMClient):
     ### Public methods
     def chat_completion(
         self,
-        messages: List[Dict[str, str]], 
+        messages: List[Dict[str, str]],
         **kwargs: Any
     ) -> Dict[str, Any]:
         """
-        call LLM chat-completions, return Json dictionary
+        Call the LLM chat-completions endpoint.
+
+        params
+        ------
+        messages: conversation history for the model
+        **kwargs: additional request parameters
+
+        return
+        ------
+        JSON response from the model
         """
         request = {
             "model": self.model,
@@ -145,7 +162,15 @@ class DeepSeekClient(LLMClient):
         article: str
     ) -> str:
         """
-        Parse the article into structured text
+        Parse the article into structured text.
+
+        params
+        ------
+        article: raw article content
+
+        return
+        ------
+        Structured text produced by the model
         """
         system_prompt="""
 # Role: Document Analysis Expert
@@ -232,8 +257,16 @@ As a Document Analysis Expert, you must adhere to the above Rules and follow the
         user_query: str
     ) -> str:
         """
-        Resolve associations with user goals 
-        based on incoming structured article content
+        Resolve associations between the article and user query.
+
+        params
+        ------
+        article: structured article content
+        user_query: user's research question
+
+        return
+        ------
+        Text describing the connections
         """
         system_prompt="""
 # Role: Advanced Demand Analysis Specialist

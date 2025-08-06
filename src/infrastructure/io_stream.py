@@ -23,13 +23,15 @@ class IOStream(ABC):
     @classmethod
     def register(cls, name: str):
         """
-        Large model client registration function, 
-        the return value is the decorator function
-        
-        Example:
-            @IOStream.register("deepseek")
-            class DeepSeekClient(IOStream):
-                ...
+        Register an IOStream subclass under a provider name.
+
+        params
+        ------
+        name: provider name used for registration
+
+        return
+        ------
+        Decorator that registers the subclass
         """
         def decorator(subcls: Type["IOStream"]):
             if name in cls._registry:
@@ -41,7 +43,16 @@ class IOStream(ABC):
     @classmethod
     def create(cls, provider_name: str, **kwargs: Any) -> "IOStream":
         """
-        Find the instantiation method of the corresponding subclass by name
+        Instantiate a registered IOStream subclass by name.
+
+        params
+        ------
+        provider_name: name of the registered provider
+        **kwargs: parameters forwarded to the subclass constructor
+
+        return
+        ------
+        Instance of the specified IOStream subclass
         """
         subcls = cls._registry.get(provider_name)
         if subcls is None:
@@ -54,12 +65,30 @@ class IOStream(ABC):
     @abstractmethod
     def input(self, query: str, **kwargs: Any) -> str:
         """
-        Standard IO input
+        Standard IO input.
+
+        params
+        ------
+        query: prompt shown to the user
+        **kwargs: additional parameters
+
+        return
+        ------
+        User-provided string
         """
     
     
     @abstractmethod
     def output(self, query: str, **kwargs: Any) -> Any:
         """
-        Standard IO output
+        Standard IO output.
+
+        params
+        ------
+        query: text to output
+        **kwargs: additional parameters
+
+        return
+        ------
+        Result of the output operation
         """
