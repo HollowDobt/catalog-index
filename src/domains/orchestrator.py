@@ -52,7 +52,6 @@ def process_raw_article_with_llm(
     raw_article: str, 
     meta_id: str, 
     memory: Mem0Client, 
-    LLM_client_for_raw_message: LLMClient, 
     LLM_client_for_embedding: LLMClient,
     LLM_client_for_article_structing: ArticleStructuring,
     raw_message: str, 
@@ -210,15 +209,14 @@ def main(
                             # Submit to the thread pool for concurrent large model processing
                             llm_executor.submit(
                                 process_raw_article_with_llm,
-                                raw_article,
-                                meta['id'],
-                                memory,
-                                LLM_client_for_raw_message,
-                                embedding_client,
-                                LLM_client_for_article_structing,
-                                raw_message,
-                                result_queue,
-                                raw_article_parse
+                                raw_article=raw_article,
+                                meta_id=meta['id'],
+                                memory=memory,
+                                LLM_client_for_embedding=embedding_client,
+                                LLM_client_for_article_structing=LLM_client_for_article_structing,
+                                raw_message=raw_message,
+                                result_queue=result_queue,
+                                raw_article_parse=raw_article_parse
                             )
                             print("    → Submitted to the large model processing thread pool")
                         
