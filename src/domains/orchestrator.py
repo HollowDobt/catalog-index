@@ -1,7 +1,7 @@
 """
-=========================
-|src/application/main.py|
-=========================
+=============================
+|src/domains/orchestrator.py|
+=============================
 
 # Main Function
 # From user's question to user's answer
@@ -98,7 +98,7 @@ def main(
         embedding_llm_model: str,
         max_workers_llm=8,   # Maximum number of threads for large model processing
         max_search_retries=2
-    ) -> int:
+    ) -> str:
     """
     From user input to output of scientific research database API code
     
@@ -279,20 +279,21 @@ def main(
         
         # Output all results
         ss = "\n".join(ans)
-        operate_interface.output(ss)
+        p = operate_interface.output(ss)
         
-        return 0
+        return p
             
     except KeyboardInterrupt:
         print("\nUser interrupted, resources are being cleaned up...")
         llm_executor.shutdown(wait=False)
+        p = ""
         raise
     except Exception as exc:
         print(f"\nAn error occurred during processing: {exc}")
         llm_executor.shutdown(wait=False)
+        p = ""
         raise
     finally:
         # Make sure the thread pool is shut down
         if not llm_executor._shutdown:
             llm_executor.shutdown(wait=False)
-            return 0

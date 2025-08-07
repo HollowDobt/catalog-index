@@ -20,12 +20,12 @@ load_dotenv(DOT_ENV_PATH_PUBLIC)
 
 
 @dataclass
-    @IOStream.register("debug")
-    class DebugTerminalIO(IOStream):
-        """
-        IO utils based on terminal
-        Only in debug time
-        """
+@IOStream.register("debug")
+class DebugTerminalIO(IOStream):
+    """
+    IO utils based on terminal
+    Only in debug time
+    """
 
     def input(self, query: str, **kwargs) -> str:
         """
@@ -42,7 +42,7 @@ load_dotenv(DOT_ENV_PATH_PUBLIC)
         """
         return input(query)
 
-    def output(self, query: str, **kwargs: Any) -> Any:
+    def output(self, query: str, **kwargs: Any) -> str:
         """
         Save text to the cache directory.
 
@@ -67,3 +67,5 @@ load_dotenv(DOT_ENV_PATH_PUBLIC)
             f.write(query)
             if not query.endswith("\n"):
                 f.write("\n")
+        
+        return str(filepath)
