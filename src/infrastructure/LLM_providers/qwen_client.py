@@ -153,23 +153,6 @@ class QwenClient(LLMClient):
         }
         return self._post(request=request)
     
-    def analyze(
-        self,
-        article: str,
-    ) -> str:
-        """
-        Analyze article content.
-
-        params
-        ------
-        article: raw article text
-
-        return
-        ------
-        Structured text produced by the model
-        """
-        ...
-    
     
     def find_connect(
         self,

@@ -54,6 +54,7 @@ def process_raw_article_with_llm(
     memory: Mem0Client, 
     LLM_client_for_raw_message: LLMClient, 
     LLM_client_for_embedding: LLMClient,
+    LLM_client_for_article_structing: ArticleStructuring,
     raw_message: str, 
     result_queue: queue.Queue,
     raw_article_parse: PDFToMarkdownConverter
@@ -65,7 +66,7 @@ def process_raw_article_with_llm(
     try:
         
         # Analytical Articles
-        ana_article = LLM_client_for_raw_message.analyze(raw_article_parse.convert(raw_article).markdown_text)
+        ana_article = LLM_client_for_article_structing.analyze(raw_article_parse.convert(raw_article).markdown_text)
         
         # Save to Memory
         memory.add_memory(
@@ -137,6 +138,7 @@ def main(
     memory = Mem0Client()
     raw_article_parse = PDFToMarkdownConverter()
     embedding_client = LLMClient.create(embedding_llm, model=embedding_llm_model)
+    LLM_client_for_article_structing = ArticleStructuring(llm="deepseek", llm_model="deepseek-reasoner")
     
     print(f"Start processing NUMBER = **{len(api_code)}** API code nodes...")
     
@@ -213,6 +215,7 @@ def main(
                                 memory,
                                 LLM_client_for_raw_message,
                                 embedding_client,
+                                LLM_client_for_article_structing,
                                 raw_message,
                                 result_queue,
                                 raw_article_parse

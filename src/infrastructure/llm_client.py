@@ -110,23 +110,7 @@ class LLMClient(ABC):
         JSON response from the API
         """
     
-    @abstractmethod
-    def analyze(
-        self,
-        article: str,
-    ) -> str:
-        """
-        Analyze article content.
-
-        params
-        ------
-        article: raw article content
-
-        return
-        ------
-        Structured text produced by the model
-        """
-        
+    
     @abstractmethod
     def find_connect(
         self,

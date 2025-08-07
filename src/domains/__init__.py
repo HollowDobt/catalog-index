@@ -13,11 +13,13 @@ from typing import List
 
 from .academicDB_rag import AcademicDBRAG # noqa: F401
 from .orchestrator import main # noqa: F401
+from .article_process import ArticleStructuring # noqa: F401
 
 
 __all__: List[str] = [
     "AcademicDBRAG",
-    "main"
+    "main",
+    "ArticleStructuring"
 ]
 
 
