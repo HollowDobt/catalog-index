@@ -106,13 +106,12 @@ class ArticleStructuring:
     llm_model: str
     _LLM_client: LLMClient = field(init=False)
     
-    
-    def __post_init___(self) -> None:
+    def __post_init__(self) -> None:
         """
         After initialization, The LLM client will be automatically instantiated
         """
         self._LLM_client = LLMClient.create(self.llm, model=self.llm_model)
-    
+        
     
     def _chunk_article(self, text: str, chunk_size: int = 4000) -> List[str]:
         """
@@ -131,6 +130,8 @@ class ArticleStructuring:
         chunks: List[str] = []
         current_chunk: str = ""
         
+        # When the number of words in the current paragraph plus the number of words in the existing text does not exceed the upper limit of the segment, 
+        # add the current paragraph to the current segment. Otherwise, add the existing paragraph to the list used to store segments and clear the existing segment.
         for para in paragraphs:
             if len(current_chunk) + len(para) < chunk_size:
                 current_chunk += para + "\n\n"
@@ -138,12 +139,13 @@ class ArticleStructuring:
                 if chunk_size:
                     chunks.append(current_chunk.strip())
                 current_chunk = para + "\n\n"
-                
+        
+        # Avoid having leftover segments that have not yet been added to the list for storing segments
         if current_chunk:
             chunks.append(current_chunk.strip())
         
         return chunks
-
+    
     
     def analyze(self, article: str) -> str:
         """
@@ -158,71 +160,25 @@ class ArticleStructuring:
         A structured article
         """
         chunks = self._chunk_article(text=article)
-        all_prompts = []
+        out_prompt: str = ""
         
-        for i, chunk in enumerate(chunks):
+        for chunk in enumerate(chunks):
             chunk_prompt = f"""
-## Task
-Extract structured information from paper segment {i+1}/{len(chunks)}
+### Extracted Prompt 1 (If it is the first paragraph, the result of this part may be empty. Please ignore it.)
+{out_prompt}
 
-### Paper Segment
-{chunk}
-
-### Instructions
-1. Extract all relevant information from this segment
-2. Generate bilingual structured prompts according to the format requirements
-3. Ensure prompts are self-contained and optimized for vector embedding
-4. Maintain factual accuracy and avoid interpretation beyond the text
-
-### Output
-Generate structured prompts for all applicable categories found in this segment.
+### Extracted Prompt 2
+{chunks}
 """
-
             messages = [
                 {"role": "system", "content": SYSTEM_PROMPT},
                 {"role": "user", "content": chunk_prompt}
             ]
             
-            response = self._LLM_client.chat_completion(
-                messages=messages, 
+            out_prompt = self._LLM_client.chat_completion(
+                messages=messages,
                 temperature=0.3,
                 max_tokens=4000
-            )
-            
-            all_prompts.append(response["choices"][0]["message"]["content"])
-            
-        out_article: str = ""
-        consolidation_prompt = ""
-        for prompt in all_prompts:
-            consolidation_prompt = f"""
-## Task: Consolidate and organize two extracted prompts(May be empty)
-
-### Extracted Prompt 1
-{out_article}
-
-### Extracted Prompt 2
-{prompt}
-
-### Instructions
-1. Merge and deduplicate prompts from all segments
-2. Organize by category maintaining the 8-category structure
-3. Ensure bilingual consistency
-4. Add paper-level summary prompts
-5. Format for optimal vector retrieval
-
-### Final Output Format
-Provide a complete, structured set of bilingual prompts covering the entire paper.
-"""
-
-            final_messages = [
-                {"role": "system", "content": SYSTEM_PROMPT},
-                {"role": "user", "content": consolidation_prompt}
-            ]
-            
-            out_article = self._LLM_client.chat_completion(
-                messages=final_messages,
-                temperature=0.2,
-                max_tokens=20000
             )["choices"][0]["message"]["content"]
-        
-        return out_article
+            
+        return out_prompt
