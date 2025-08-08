@@ -113,7 +113,7 @@ class ArticleStructuring:
         self._LLM_client = LLMClient.create(self.llm, model=self.llm_model)
         
     
-    def _chunk_article(self, text: str, chunk_size: int = 4000) -> List[str]:
+    def _chunk_article(self, text: str, chunk_size: int = 6000) -> List[str]:
         """
         Split article into manageable chunks while preserving paragraph integrity.
         
@@ -162,13 +162,13 @@ class ArticleStructuring:
         chunks = self._chunk_article(text=article)
         out_prompt: str = ""
         
-        for chunk in enumerate(chunks):
+        for i, chunk in enumerate(chunks):
             chunk_prompt = f"""
 ### Extracted Prompt 1 (If it is the first paragraph, the result of this part may be empty. Please ignore it.)
 {out_prompt}
 
 ### Extracted Prompt 2
-{chunks}
+{chunk}
 """
             messages = [
                 {"role": "system", "content": SYSTEM_PROMPT},
@@ -178,7 +178,7 @@ class ArticleStructuring:
             out_prompt = self._LLM_client.chat_completion(
                 messages=messages,
                 temperature=0.3,
-                max_tokens=4000
+                max_tokens=3000 + i * 300
             )["choices"][0]["message"]["content"]
             
         return out_prompt
