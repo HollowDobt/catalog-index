@@ -97,7 +97,7 @@ def main(
         embedding_llm: str,
         embedding_llm_model: str,
         max_workers_llm=8,   # Maximum number of threads for large model processing
-        max_search_retries=2
+        max_search_retries=2,
     ) -> str:
     """
     From user input to output of scientific research database API code
@@ -146,7 +146,10 @@ def main(
     # Blocking queue for LLM processing results
     result_queue = queue.Queue()
     # Thread pool used to concurrently process large model tasks
-    llm_executor = ThreadPoolExecutor(max_workers=max_workers_llm)
+    llm_executor = ThreadPoolExecutor(
+        max_workers=max_workers_llm,
+        thread_name_prefix="llm_worker"  # Add thread names for better debugging
+    )
     # Track search attempts
     search_attempt = 0
     current_keywords = process1_message["choices"][0]["message"]["content"]
@@ -264,9 +267,12 @@ def main(
                 else:
                     print(f"\n✗ The maximum number of retries has been reached ({max_search_retries}), No suitable papers were found.")
         
-        # Wait for all large model processing tasks to complete
+        # Wait for all large model processing tasks to complete with timeout
         print(f"\nWait for all large model processing tasks to complete...")
-        llm_executor.shutdown(wait=True)
+        import concurrent.futures
+        
+        # Shutdown without waiting
+        llm_executor.shutdown(wait=False)
         
         elapsed_time = time.time() - start_time
         print(f"\nAll processing completed, total time: {elapsed_time:.1f} 秒")
@@ -286,15 +292,24 @@ def main(
             
     except KeyboardInterrupt:
         print("\nUser interrupted, resources are being cleaned up...")
-        llm_executor.shutdown(wait=False)
+        try:
+            llm_executor.shutdown(wait=False)  # Quick shutdown without waiting
+        except:
+            pass  # Ignore shutdown errors during cleanup
         p = ""
         raise
     except Exception as exc:
         print(f"\nAn error occurred during processing: {exc}")
-        llm_executor.shutdown(wait=False)
+        try:
+            llm_executor.shutdown(wait=False)  # Quick shutdown without waiting
+        except:
+            pass  # Ignore shutdown errors during cleanup
         p = ""
         raise
     finally:
-        # Make sure the thread pool is shut down
-        if not llm_executor._shutdown:
-            llm_executor.shutdown(wait=False)
+        # Make sure the thread pool is shut down (only if not already shut down)
+        if hasattr(llm_executor, '_shutdown') and not llm_executor._shutdown:
+            try:
+                llm_executor.shutdown(wait=False)  # Quick shutdown with timeout
+            except:
+                pass  # Ignore shutdown errors during cleanup

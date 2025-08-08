@@ -29,28 +29,26 @@ __all__: List[str] = [
 
 
 # Automatically import python lib from LLM_providers/
-_provider_pkg_name = f"{__name__}.LLM_providers"
-_provider_pkg_path = Path(__file__).parent / "LLM_providers"
+def _import_submodules(base_name, subdir_name):
+    """Helper function to dynamically import submodules"""
+    try:
+        pkg_path = Path(__file__).parent / subdir_name
+        if not pkg_path.exists():
+            print(f"Warning: Directory {pkg_path} does not exist")
+            return
+            
+        for _file in pkg_path.glob("*.py"):
+            if _file.stem.startswith("_") or _file.stem == "__init__":
+                continue
+            try:
+                import_module(f"{base_name}.{subdir_name}.{_file.stem}")
+            except ImportError as e:
+                print(f"Warning: Failed to import {base_name}.{subdir_name}.{_file.stem}: {e}")
+                continue
+    except Exception as e:
+        print(f"Warning: Error importing from {subdir_name}: {e}")
 
-for _file in _provider_pkg_path.glob("*.py"):
-    if _file.stem.startswith("_") or _file.stem == "__init__":
-        continue
-    import_module(f"{_provider_pkg_name}.{_file.stem}")
-
-# Automatically import python lib from ADB_providers/
-_provider_pkg_name = f"{__name__}.ADB_providers"
-_provider_pkg_path = Path(__file__).parent / "ADB_providers"
-
-for _file in _provider_pkg_path.glob("*.py"):
-    if _file.stem.startswith("_") or _file.stem == "__init__":
-        continue
-    import_module(f"{_provider_pkg_name}.{_file.stem}")
-    
-# Automatically import python lib from IO_templates/
-_provider_pkg_name = f"{__name__}.IO_templates"
-_provider_pkg_path = Path(__file__).parent / "IO_templates"
-
-for _file in _provider_pkg_path.glob("*.py"):
-    if _file.stem.startswith("_") or _file.stem == "__init__":
-        continue
-    import_module(f"{_provider_pkg_name}.{_file.stem}")
+# Import from subdirectories
+_import_submodules(__name__, "LLM_providers")
+_import_submodules(__name__, "ADB_providers")
+_import_submodules(__name__, "IO_templates")

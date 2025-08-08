@@ -12,6 +12,7 @@ from domains import main
 
 
 class InputModel(BaseModel):
+    interface: str
     raw_message_process_llm: str
     raw_message_process_llm_model: str
     api_generate_llm: str
@@ -26,7 +27,7 @@ class OutputModel(BaseModel):
     result: str
 
 
-app = FastAPI(title="Library Index")
+app = FastAPI()
 
 @app.post("/research", response_model=OutputModel)
 async def research(payload: InputModel):

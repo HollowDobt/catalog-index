@@ -49,7 +49,14 @@ if ! [[ "$PYTHON_VERSION" =~ ^3\.1[12]$ ]]; then
   
   echo -e "${BLUE}[INFO] Setting Python 3.12.2 as local version...${RESET}"
   pyenv local 3.12.2
-  PYTHON_BIN="python3.12"
+  
+  # Use pyenv to get the full path to Python 3.12.2
+  PYTHON_BIN=$(pyenv which python 3.12.2)
+  if [[ -z "$PYTHON_BIN" ]]; then
+    echo -e "${RED}[ERROR] Could not find Python 3.12.2 using pyenv${RESET}" >&2
+    exit 1
+  fi
+  echo -e "${GREEN}[INFO] Using Python at: $PYTHON_BIN${RESET}"
   
   # Verify the installation
   PYTHON_VERSION=$($PYTHON_BIN -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')
