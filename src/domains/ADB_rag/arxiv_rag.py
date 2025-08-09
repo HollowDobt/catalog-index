@@ -8,11 +8,12 @@ import re
 import ast
 import json
 
-from typing import List, Any, Optional
+from typing import List, Any
 from domains.academicDB_rag import AcademicDBRAG
 from infrastructure import LLMClient
 from dataclasses import dataclass
 from arxiv_categories import *
+from arxiv_utils import *
 
 
 class ArxivRAGIllegalFormatError(RuntimeError):
@@ -180,203 +181,8 @@ class ArxivRAG(AcademicDBRAG):
 
         valid_queries = []
         for query in string_queries:
-            cleaned_query = self._clean_single_query(query.strip())
+            cleaned_query = clean_single_query(query.strip())
             if cleaned_query and cleaned_query not in valid_queries:
                 valid_queries.append(cleaned_query)
 
         return valid_queries
-
-    def _clean_single_query(self, query: str) -> Optional[str]:
-        """
-        Clean a single query string.
-
-        params
-        ------
-        query: query string to be normalized and validated
-
-        return
-        ------
-        Cleaned query string or None if invalid
-        """
-        if not query:
-            return None
-
-        try:
-            # Standardize field prefixes
-            query = self._normalize_field_prefixes(query)
-
-            # Validation field prefix
-            if not self._validate_field_prefixes(query):
-                return None
-
-            # Clean up invalid category codes
-            query = self._clean_category_codes(query)
-
-            # Clean up query format
-            query = query.strip("+ ")
-
-            return query if query else None
-
-        except Exception as e:
-            return None
-
-    def _normalize_field_prefixes(self, query: str) -> str:
-        """
-        Standardize field prefixes within a query.
-
-        params
-        ------
-        query: query string containing field prefixes
-
-        return
-        ------
-        Query string with normalized prefixes
-        """
-        # Split the query to process individual parts
-        segments = re.split(r"(\+(?:AND|OR|ANDNOT)\+)", query, flags=re.IGNORECASE)
-        new_segments = []
-
-        for seg in segments:
-            if re.match(r"^\+(?:AND|OR|ANDNOT)\+$", seg, re.IGNORECASE):
-                new_segments.append(seg.upper())
-            elif seg.strip():
-                new_segments.append(self._normalize_field_segment(seg))
-
-        return "".join(new_segments)
-
-    def _normalize_field_segment(self, segment: str) -> str:
-        """
-        Standardize a single field segment.
-
-        params
-        ------
-        segment: single segment of a query containing a field prefix
-
-        return
-        ------
-        Segment with normalized field prefix
-        """
-        if ":" not in segment:
-            return segment
-
-        prefix, rest = segment.split(":", 1)
-        prefix_lower = prefix.lower()
-
-        # Using synonym maps
-        if prefix_lower in FIELD_PREFIX_SYNONYMS:
-            prefix = FIELD_PREFIX_SYNONYMS[prefix_lower]
-        else:
-            prefix = prefix_lower
-
-        return f"{prefix}:{rest}"
-
-    def _validate_field_prefixes(self, query: str) -> bool:
-        """
-        Verify that the field prefixes in a query are valid.
-
-        params
-        ------
-        query: query string to inspect
-
-        return
-        ------
-        True if all prefixes are allowed, otherwise False
-        """
-        segments = re.split(r"\+(?:AND|OR|ANDNOT)\+", query, flags=re.IGNORECASE)
-
-        for seg in segments:
-            seg = seg.strip()
-            if not seg:
-                continue
-
-            if ":" in seg:
-                prefix = seg.split(":", 1)[0].lower()
-                if prefix not in ALLOWED_FIELD_PREFIXES:
-                    return False
-
-        return True
-
-    def _clean_category_codes(self, query: str) -> str:
-        """
-        Clean up invalid category codes in a query.
-
-        params
-        ------
-        query: query string containing category specifications
-
-        return
-        ------
-        Query string with invalid categories removed
-        """
-        segments = re.split(r"(\+(?:AND|OR|ANDNOT)\+)", query, flags=re.IGNORECASE)
-
-        # Check if there are mixed operators
-        operators = [
-            s.upper()
-            for s in segments
-            if re.match(r"^\+(?:AND|OR|ANDNOT)\+$", s, re.IGNORECASE)
-        ]
-        has_and = any(op in ["+AND+", "+ANDNOT+"] for op in operators)
-        has_or = any(op == "+OR+" for op in operators)
-        mixed_ops = has_and and has_or
-
-        # If there are mixed operators and there are invalid categories, abandon the entire query
-        if mixed_ops and self._has_invalid_category(segments):
-            return ""
-
-        # Remove invalid category segments
-        valid_segments = []
-        skip_next_operator = False
-
-        for i, seg in enumerate(segments):
-            if re.match(r"^\+(?:AND|OR|ANDNOT)\+$", seg, re.IGNORECASE):
-                if not skip_next_operator:
-                    valid_segments.append(seg.upper())
-                skip_next_operator = False
-            elif seg.strip():
-                if self._is_invalid_category_segment(seg):
-                    # Remove the previous operator (if present)
-                    if valid_segments and re.match(
-                        r"^\+(?:AND|OR|ANDNOT)\+$", valid_segments[-1]
-                    ):
-                        valid_segments.pop()
-                    skip_next_operator = True
-                else:
-                    valid_segments.append(seg)
-
-        return "".join(valid_segments)
-
-    def _has_invalid_category(self, segments: List[str]) -> bool:
-        """
-        Check whether any query segment contains an invalid category.
-
-        params
-        ------
-        segments: list of query segments to evaluate
-
-        return
-        ------
-        True if an invalid category is found, otherwise False
-        """
-        for seg in segments:
-            if self._is_invalid_category_segment(seg):
-                return True
-        return False
-
-    def _is_invalid_category_segment(self, segment: str) -> bool:
-        """
-        Determine whether a segment is an invalid category segment.
-
-        params
-        ------
-        segment: query segment to check
-
-        return
-        ------
-        True if the segment has an invalid category code, otherwise False
-        """
-        segment = segment.strip()
-        if segment.lower().startswith("cat:"):
-            cat_value = segment[4:]
-            return cat_value not in ALLOWED_CATEGORIES
-        return False
