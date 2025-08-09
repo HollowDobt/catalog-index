@@ -20,6 +20,8 @@ import threading
 import queue
 import json
 import uuid
+import math
+import re
 from collections import defaultdict
 
 
@@ -278,6 +280,244 @@ class IntelligentResearchAgent:
             summary.append(f"- {action['action']}: {action.get('details', {}).get('summary', '执行完成')}")
         
         return "\n".join(summary)
+    
+    
+    # Filter invalid information to reduce token consumption
+    def _filter_invalid_content(self, content: str) -> str:
+        """
+        Filter out invalid or meaningless content from analysis results
+        
+        params
+        ------
+        content: Original find_connect return value
+        
+        return
+        ------
+        Pure valid information after filtering the original value
+        """
+        if not content or not isinstance(content, str):
+            return ""
+        
+        # Define patterns for invalid content
+        invalid_patterns = [
+            # Chinese
+            r"没有?找到.*?关联",
+            r"未能?找到.*?连接",
+            r"无法.*?建立联系",
+            r"缺乏.*?相关性", 
+            r"不存在.*?直接关系",
+            r"无相关.*?信息",
+            r"无法.*?确定关联",
+            r"未发现.*?联系",
+            r"抱歉.*?没有找到",
+            r"很抱歉.*?无法",
+            r"对不起.*?找不到",
+            r"没有相关.*?内容"
+            
+            # English
+            r"not\s+found.*?(connection|link|relation|association)",
+            r"unable\s+to\s+find.*?(connection|link|relation|association)",
+            r"cannot\s+(establish|create|make).*?(connection|link|relation|association)",
+            r"lack(s)?\s+.*?(relevance|relevancy|relation|association)",
+            r"no\s+.*?(direct\s+relation|direct\s+link|direct\s+connection)",
+            r"no\s+related.*?(information|content|data)",
+            r"cannot\s+determine.*?(relation|association|connection)",
+            r"(not\s+found|did\s+not\s+find).*(contact|connection|relation|link)",
+            r"sorry.*?(no|not\s+found|unable)",
+            r"apologies.*?(no|not\s+found|unable)",
+            r"no\s+related.*?(content|information|data)"
+        ]
+        
+        # Check if content contains too many invalid patterns
+        invalid_count = 0
+        for pattern in invalid_patterns:
+            if re.search(pattern, content, re.IGNORECASE):
+                invalid_count += 1
+        
+        # If more than half the content is invalid patterns, filter it out
+        total_sentences = len(re.split(r'[。！？.!?\n]', content))
+        if invalid_count > total_sentences * 0.5:  # 50% threshold
+            return ""
+        
+        # Remove specific invalid sentences but keep the rest
+        filtered_content = content
+        for pattern in invalid_patterns:
+            filtered_content = re.sub(pattern + r'[。！？]*', '', filtered_content, flags=re.IGNORECASE)
+        
+        # Clean up extra whitespace
+        filtered_content = re.sub(r'\n\s*\n', '\n', filtered_content.strip())
+        
+        # Return empty if too short after filtering
+        if len(filtered_content.strip()) < 50:
+            return ""
+            
+        return filtered_content.strip()
+    
+    
+    # Let the AI merge the results of the two diffenret find_connect calls 
+    def _merge_two_contents(self, content1: str, content2: str, max_tokens: int, level: int) -> str:
+        """
+        Merge two content pieces using LLM with specified token limit
+        
+        params
+        ------
+        content1 & content2: Two result segments that need to be merged
+        max_tokens: The maximum number of tokens allowed to be consumed
+        level: 
+        
+        return
+        ------
+        
+        """
+        
+        # If both are empty, return empty
+        if not content1 and not content2:
+            return ""
+        
+        # If either content is empty after filtering, return the other
+        if not content1:
+            return content2
+        if not content2:
+            return content1
+        
+        system_prompt = f"""
+你是一个专业的学术信息整合专家。擅长将多个研究内容合并为结构化、逻辑清晰的综合报告。请将用户提供的两段研究内容进行智能合并，要求：
+
+1. **保持信息完整性**：不丢失重要的研究发现和核心观点
+2. **消除冗余**：合并重复信息，避免不必要的重复
+3. **逻辑整理**：按照逻辑关系重新组织内容结构
+4. **语言优化**：确保合并后的内容语言流畅、条理清晰
+5. **突出关联**：强调内容间的关联性和互补性
+6. **控制长度**：合并后的内容应控制在{max_tokens}个token以内
+"""
+        
+        merge_prompt = f"""
+## 用户原始查询
+{self.context.user_query}
+
+## 内容A
+{content1}
+
+## 内容B  
+{content2}
+
+## 合并要求
+- 围绕用户查询进行内容整合
+- 突出两个内容的互补性和关联性
+- 去除冗余信息，保留核心观点
+- 确保合并后内容逻辑清晰、结构完整
+- 输出简洁且信息密度高的整合结果
+
+请直接输出合并后的内容，不要包含任何说明文字：
+"""
+        
+        try:
+            message = [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": merge_prompt}
+            ]
+            
+            response = self.llm_query_processor.chat_completion(
+                messages=message, 
+                temperature=0.3,
+                max_tokens=max_tokens
+            )
+            
+            merged_content = response["choices"][0]["message"]["content"].strip()
+            
+            # Final filtering of the merged content
+            final_content = self._filter_invalid_content(merged_content)
+            return final_content if final_content else (content1 or content2)
+            
+        except Exception as exc:
+            print(f"  ⚠️ 合并失败 (级别 {level}): {exc}")
+            # Fallback: simple concatenation with filtering
+            fallback = f"{content1}\n\n{content2}"
+            return self._filter_invalid_content(fallback) or (content1 or content2)
+    
+    
+    # The final step is to combine multiple results into one
+    def _intelligent_synthesis_merge(self, results: List[str]) -> str:
+        """
+        Use binary tree merging with thread pool for intelligent content synthesis
+        """
+        if not results:
+            return ""
+        
+        # Filter out invalid results first
+        valid_results: List[str] = []
+        for result in results:
+            filtered_result = self._filter_invalid_content(result)
+            if filtered_result:
+                valid_results.append(filtered_result)
+                
+        if not valid_results:
+            return ""
+        
+        if len(valid_results) == 1:
+            return valid_results[0]
+        
+        print(f"🧠 开始智能信息整合，共 {len(valid_results)} 个有效结果")
+        
+        current_level = valid_results.copy()
+        level = 0
+        
+        while len(current_level) > 1:
+            level += 1
+            # Dynamic token allocation: increase tokens as we go up the merge tree
+            base_tokens = 1000 # Base tokens for first level
+            max_tokens = min(base_tokens + (level * 500), 4000)  # Cap at 4000 tokens
+            
+            print(f"  📊 合并级别 {level}，处理 {len(current_level)} 个片段，允许 {max_tokens} tokens")
+            
+            # Create pairs for merging
+            pairs = []
+            for i in range(0, len(current_level), 2):
+                if i + 1 < len(current_level):
+                    pairs.append((current_level[i], current_level[i + 1]))
+                else:
+                    # Odd number: the last item goes to next level directly
+                    pairs.append((current_level[i], ""))
+            
+            # Merge pairs in parallel using thread pool
+            next_level = []
+            with ThreadPoolExecutor(max_workers=min(self.max_workers, len(pairs)), thread_name_prefix="LI-merge_worker") as executor:
+                future_to_pair = {}
+                for idx, (content1, content2) in enumerate(pairs):
+                    future = executor.submit(
+                        self._merge_two_contents, 
+                        content1, content2, max_tokens, level
+                    )
+                    future_to_pair[future] = idx
+                
+                # Collect results in order
+                pair_results = [""] * len(pairs)
+                for future in as_completed(future_to_pair):
+                    pair_idx = future_to_pair[future]
+                    try:
+                        merged_result = future.result()
+                        if merged_result:  # Only keep non-empty results
+                            pair_results[pair_idx] = merged_result
+                        print(f"    ✓ 完成合并对: {pair_idx}, {pair_idx + 1}. 总长度: {len(pairs)}")
+                    except Exception as exc:
+                        print(f"    ✗ 合并对 {pair_idx}, {pair_idx + 1} 失败: {exc}")
+                        # Fallback: use the first content of the pair
+                        pair_results[pair_idx] = pairs[pair_idx][0] if pairs[pair_idx][0] else ""
+                
+                # Filter out None and empty results
+                next_level = [result for result in pair_results if result and result.strip()]
+            
+            if not next_level:
+                # If all merging failed, return the best we have
+                return valid_results[0] if valid_results else ""
+            
+            current_level = next_level
+            print(f"  ✅ 级别 {level} 完成，剩余 {len(current_level)} 个片段")
+        
+        final_result = current_level[0] if current_level else ""
+        print(f"🎯 智能整合完成，最终结果长度: {len(final_result)} 字符")
+        
+        return final_result
     
     
     # Generate a prompt-word paper abstract based on a single metadata
@@ -598,10 +838,10 @@ class IntelligentResearchAgent:
     
     
     ### STATE FUNCTION
-    # Combining all the previous papers to generate the final results
+    # Combining all the previous papers to generate the final results with intelligent synthesis
     def _handle_synthesis(self) -> AgentState:
         """
-        Synthesize all results and present to user
+        Synthesize all results using intelligent binary-merge algorithm and present to user
         """
         print("🔬 综合分析结果...")
         
@@ -613,6 +853,11 @@ class IntelligentResearchAgent:
         self.context.analysis_results = results
         
         if results:
+            print(f"📄 收集到 {len(results)} 个分析结果，开始整合所有信息...")
+            
+            # Use intelligent synthesis merge instead of simple concatenation
+            intelligently_merged_content = self._intelligent_synthesis_merge(results)
+
             synthesis_summary = f"""
 
 # 🎯 智库索引执行报告
@@ -625,12 +870,12 @@ class IntelligentResearchAgent:
 - 分析成功率: {(self.context.successful_analyses/max(1,self.context.processed_papers)):.1%}
 
 ## 📚 研究发现
+{intelligently_merged_content}
 """
+            print("✨ 全整合完成")
             print(synthesis_summary)
-            final_output = synthesis_summary + "\n\n" + "\n\n".join(results)
-            print(final_output)
-            self.interface.output(final_output)
-        
+            self.interface.output(synthesis_summary)
+                
         else:
             no_result_message = f"""
 # 🎯 智库索引执行报告
