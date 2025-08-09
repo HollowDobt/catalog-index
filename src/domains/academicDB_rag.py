@@ -6,7 +6,6 @@
 # Abstract academicDB_RAG tools class
 """
 
-
 from abc import ABC, abstractmethod
 from typing import Type, Dict, Any, List
 
@@ -15,10 +14,9 @@ class AcademicDBRAG(ABC):
     """
     Abstract large model tools class
     """
-    
+
     _registry: Dict[str, Type["AcademicDBRAG"]] = {}
-    
-    
+
     ### Function used when instantiating the abstract base class
     @classmethod
     def register(cls, name: str, **kwargs: Any):
@@ -34,13 +32,17 @@ class AcademicDBRAG(ABC):
         ------
         Decorator that registers the subclass
         """
+
         def decorator(subcls: Type["AcademicDBRAG"]):
             if name in cls._registry:
-                raise KeyError(f"Academic RAG provider '{name}' cannot be registered again.")
+                raise KeyError(
+                    f"Academic RAG provider '{name}' cannot be registered again."
+                )
             cls._registry[name] = subcls
             return subcls
+
         return decorator
-    
+
     @classmethod
     def create(cls, provider_name: str, **kwargs: Any) -> "AcademicDBRAG":
         """
@@ -58,10 +60,11 @@ class AcademicDBRAG(ABC):
         subcls = cls._registry.get(provider_name)
         if subcls is None:
             valid = ", ".join(cls._registry.keys())
-            raise ValueError(f"Unknown LLMClient provider name '{provider_name}'. Available: {valid}")
+            raise ValueError(
+                f"Unknown LLMClient provider name '{provider_name}'. Available: {valid}"
+            )
         return subcls(**kwargs)
-    
-    
+
     ### Required functions for subclasses
     @abstractmethod
     def api_coding(self, request: str) -> List[str]:
@@ -76,4 +79,3 @@ class AcademicDBRAG(ABC):
         ------
         List of query strings compatible with the ArXiv API
         """
-

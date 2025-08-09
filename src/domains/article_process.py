@@ -6,7 +6,6 @@
 # Article processor to analyze articles
 """
 
-
 from typing import List
 from dataclasses import dataclass, field
 from infrastructure import LLMClient
@@ -101,27 +100,26 @@ class ArticleStructuring:
     """
     Tools for structuring articles
     """
-    
+
     llm: str
     llm_model: str
     _LLM_client: LLMClient = field(init=False)
-    
+
     def __post_init__(self) -> None:
         """
         After initialization, The LLM client will be automatically instantiated
         """
         self._LLM_client = LLMClient.create(self.llm, model=self.llm_model)
-        
-    
+
     def _chunk_article(self, text: str, chunk_size: int = 6000) -> List[str]:
         """
         Split article into manageable chunks while preserving paragraph integrity.
-        
+
         params
         ------
         text: raw article content
         chunk_size: the size of a processing block
-        
+
         return
         ------
         A list of the structured article chunks.
@@ -129,8 +127,8 @@ class ArticleStructuring:
         paragraphs = text.split("\n\n")
         chunks: List[str] = []
         current_chunk: str = ""
-        
-        # When the number of words in the current paragraph plus the number of words in the existing text does not exceed the upper limit of the segment, 
+
+        # When the number of words in the current paragraph plus the number of words in the existing text does not exceed the upper limit of the segment,
         # add the current paragraph to the current segment. Otherwise, add the existing paragraph to the list used to store segments and clear the existing segment.
         for para in paragraphs:
             if len(current_chunk) + len(para) < chunk_size:
@@ -139,29 +137,28 @@ class ArticleStructuring:
                 if chunk_size:
                     chunks.append(current_chunk.strip())
                 current_chunk = para + "\n\n"
-        
+
         # Avoid having leftover segments that have not yet been added to the list for storing segments
         if current_chunk:
             chunks.append(current_chunk.strip())
-        
+
         return chunks
-    
-    
+
     def analyze(self, article: str) -> str:
         """
         Parse the paper into structured prompt words
-        
+
         params
         ------
         article: a raw article
-        
+
         return
         ------
         A structured article
         """
         chunks = self._chunk_article(text=article)
         out_prompt: str = ""
-        
+
         for i, chunk in enumerate(chunks):
             chunk_prompt = f"""
 ### Extracted Prompt 1 (If it is the first paragraph, the result of this part may be empty. Please ignore it.)
@@ -172,13 +169,11 @@ class ArticleStructuring:
 """
             messages = [
                 {"role": "system", "content": SYSTEM_PROMPT},
-                {"role": "user", "content": chunk_prompt}
+                {"role": "user", "content": chunk_prompt},
             ]
-            
+
             out_prompt = self._LLM_client.chat_completion(
-                messages=messages,
-                temperature=0.3,
-                max_tokens=3000 + i * 300
+                messages=messages, temperature=0.3, max_tokens=3000 + i * 300
             )["choices"][0]["message"]["content"]
-            
+
         return out_prompt

@@ -4,7 +4,6 @@
 ========================
 """
 
-
 from fastapi import FastAPI
 from pydantic import BaseModel
 
@@ -18,7 +17,7 @@ class InputModel(BaseModel):
     api_generate_llm: str
     api_generate_llm_model: str
     embedding_llm: str
-    embedding_llm_model:str
+    embedding_llm_model: str
     max_workers_llm: int = 8
     max_search_retries: int = 2
 
@@ -28,6 +27,7 @@ class OutputModel(BaseModel):
 
 
 app = FastAPI()
+
 
 @app.post("/research", response_model=OutputModel)
 async def research(payload: InputModel):

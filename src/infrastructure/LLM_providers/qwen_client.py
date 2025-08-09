@@ -6,7 +6,6 @@
 # QWEN LLM specific implementation of the LLMClient class
 """
 
-
 import os
 import uuid
 import json
@@ -30,6 +29,7 @@ class QwenInitConnectError(RuntimeError):
     Failed to get 200 code when initialization.
     """
 
+
 class QwenConnectError(RuntimeError):
     """
     Failed to get 200 code.
@@ -42,19 +42,18 @@ class QwenClient(LLMClient):
     """
     Qwen LLM specific implementation of the LLMClient class
     """
-    
-    # The request function "_headers" header is automatically generated in subsequent requests 
+
+    # The request function "_headers" header is automatically generated in subsequent requests
     # and does not need to be generated during initialization.
     model: str
-    
+
     _headers: Dict[str, str] = field(default_factory=dict, init=False)
     _raw_timeout: str | None = os.getenv("TIME_OUT_LIMIT")
-    
+
     api_key: str | None = os.getenv("QWEN_API_KEY")
     base_url: str | None = os.getenv("QWEN_BASE_URL")
     end_point: str | None = os.getenv("QWEN_ENDPOINT")
     time_out: int | None = int(_raw_timeout) if _raw_timeout else None
-
 
     def __post_init__(self) -> None:
         """
@@ -62,46 +61,52 @@ class QwenClient(LLMClient):
         """
         self._headers = {
             "Content-Type": "application/json",
-            "Authorization": f"Bearer {self.api_key}"
+            "Authorization": f"Bearer {self.api_key}",
         }
         self._health_check()
-    
+
     def _health_check(self) -> None:
         """
         Initiate a standard request to determine if there is a normal response
         """
-        
+
         # First confirm that the client variable has been set
         missing_value = (
-            "api_key"   if self.api_key   is None else
-            "base_url"  if self.base_url  is None else
-            "end_point" if self.end_point is None else
-            "time_out"  if self.time_out  is None else
-            None
+            "api_key"
+            if self.api_key is None
+            else (
+                "base_url"
+                if self.base_url is None
+                else (
+                    "end_point"
+                    if self.end_point is None
+                    else "time_out" if self.time_out is None else None
+                )
+            )
         )
         if missing_value:
-            raise ValueError(f"{missing_value} is not found in .private.env and .public.env")
-        
+            raise ValueError(
+                f"{missing_value} is not found in .private.env and .public.env"
+            )
+
         try:
             response = self.chat_completion(
                 messages=[
                     {"role": "system", "content": "You are a ping test agent."},
-                    {"role": "user", "content": "ping test"}
+                    {"role": "user", "content": "ping test"},
                 ],
                 temperature=0.0,
                 max_tokens=1,
-                user=str(uuid.uuid4())
+                user=str(uuid.uuid4()),
             )
-            _response = response["choices"][0]["message"]["content"] #noqa: B018
+            _response = response["choices"][0]["message"]["content"]  # noqa: B018
         except Exception as exc:
-            print("Qwen initalize error. This often happens when base_url, api, or end_point are incorrect.")
+            print(
+                "Qwen initalize error. This often happens when base_url, api, or end_point are incorrect."
+            )
             raise QwenInitConnectError("Unable to connect to Qwen server") from exc
-        
-        
-    def _post(
-        self,
-        request: Dict[str, Any]
-    ) -> Dict[str, Any]:
+
+    def _post(self, request: Dict[str, Any]) -> Dict[str, Any]:
         """
         Send a POST request to the Qwen API.
 
@@ -117,22 +122,16 @@ class QwenClient(LLMClient):
         assert self.end_point, "end_point required"
         url = self.base_url.rstrip("/") + self.end_point
         response = requests.post(
-            url,
-            headers=self._headers,
-            data=json.dumps(request),
-            timeout=self.time_out
+            url, headers=self._headers, data=json.dumps(request), timeout=self.time_out
         )
         if response.status_code // 100 != 2:
             raise QwenConnectError(
                 f"No correct return value was obtained. Details: [{response.status_code}] {response.text[:300]}"
             )
         return response.json()
-    
-    
+
     def chat_completion(
-        self,
-        messages: List[Dict[str, str]],
-        **kwargs: Any
+        self, messages: List[Dict[str, str]], **kwargs: Any
     ) -> Dict[str, Any]:
         """
         Call the LLM chat-completions endpoint.
@@ -152,13 +151,8 @@ class QwenClient(LLMClient):
             **kwargs,
         }
         return self._post(request=request)
-    
-    
-    def find_connect(
-        self,
-        article: str,
-        user_query: str
-    ) -> str:
+
+    def find_connect(self, article: str, user_query: str) -> str:
         """
         Find connections between an article and the user query.
 
@@ -171,7 +165,7 @@ class QwenClient(LLMClient):
         ------
         Text describing the connections
         """
-        system_prompt="""
+        system_prompt = """
 # Role: Advanced Demand Analysis Specialist
 
 ## Profile
@@ -216,7 +210,7 @@ class QwenClient(LLMClient):
    - No interpretation of implied meanings without explicit textual evidence
    - No combination of separate documents into composite analyses unless specified            
         """
-        user_prompt=f"""
+        user_prompt = f"""
 ## Workflows
 
 - Primary Objective: Deliver comprehensive relevance assessment for {user_query} related documents
@@ -240,9 +234,11 @@ It can only contains these 4 parts
 As an Advanced Demand Analysis Specialist, you are required to strictly follow the defined analytical protocols while maintaining the highest professional standards in all assessments.
         """
 
-        messages=[{"role":"system","content":system_prompt},
-                  {"role":"user","content":user_prompt+"\narticle:"+article}]
-        response=self.chat_completion(
+        messages = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt + "\narticle:" + article},
+        ]
+        response = self.chat_completion(
             messages=messages,
         )
-        return response['choices'][0]['message']['content']
+        return response["choices"][0]["message"]["content"]

@@ -3,9 +3,8 @@
 |src/infrastructure/memory_layer.py|
 ====================================
 
-# Simple encapsulation of requests to mem0 servers, 
+# Simple encapsulation of requests to mem0 servers,
 """
-
 
 from __future__ import annotations
 
@@ -30,6 +29,7 @@ class Mem0InitConnectError(RuntimeError):
     Failed to get 200 code when initialization.
     """
 
+
 class Mem0ConnectError(RuntimeError):
     """
     Failed to get 200 code.
@@ -38,10 +38,7 @@ class Mem0ConnectError(RuntimeError):
 
 MEM0_PING_CONTENT = f"__health_{uuid.uuid4()}__"
 MEM0_PING_MESSAGES: List[Dict[str, str]] = [
-        {
-                "role": "user",
-                "content": MEM0_PING_CONTENT
-        }
+    {"role": "user", "content": MEM0_PING_CONTENT}
 ]
 
 
@@ -49,11 +46,12 @@ MEM0_PING_MESSAGES: List[Dict[str, str]] = [
 ### Mem0 API Wrapper
 ### -------------------------------------------------------
 
+
 # Helper
 def _wrap_messages(msg: Union[str, List[Dict[str, str]]]) -> List[Dict[str, str]]:
     """
     Ensure we always pass a 'list[{"role", "content"}]' to 'client.add()'
-    
+
     * If the caller gives a plain string -> treat it as a 'user' message.
     * If it's already a list -> assume caller formatted it correctly.
     """
@@ -63,23 +61,24 @@ def _wrap_messages(msg: Union[str, List[Dict[str, str]]]) -> List[Dict[str, str]
         return msg
     raise ValueError("messages must be a str or list[dict{'role','content'}]")
 
+
 @dataclass
 class Mem0Client:
     """
     High-level wrapper for mem0 SDK.
-    
+
     Default host = https://api.mem0.ai
     """
-    
+
     host: str | None = os.getenv("MEM0_BASE_URL")
     api_key: str | None = os.getenv("MEM0_API_KEY")
-    
+
     _client: Any = field(init=False, repr=False)
-    
+
     def __post_init__(self) -> None:
-        
+
         host = self.host if self.host else "https://api.mem0.ai"
-        
+
         try:
             if host:
                 if not self.api_key:
@@ -88,19 +87,18 @@ class Mem0Client:
             else:
                 # TODO 尚未完成本地直接调用部分. 考虑到实际情况, 可能会放弃此方案.
                 self._client = Memory()
-        
-        except Exception as exc: # noqa: BLE001
+
+        except Exception as exc:  # noqa: BLE001
             raise Mem0InitConnectError(f"Mem0 Initialization failed: {exc}") from exc
         self._health_check()
 
-    
     def add_memory(
         self,
         messages: Union[str, List[Dict[str, str]]],
         *,
         metadata: Dict[str, Any],
         user_id: str = "Undefined",
-        infer: Optional[bool] = False
+        infer: Optional[bool] = False,
     ) -> Dict[str, Any]:
         """
         Write a memory (automatic drop graph & vector).
@@ -118,15 +116,14 @@ class Mem0Client:
         """
         try:
             return self._client.add(
-                _wrap_messages(messages), 
+                _wrap_messages(messages),
                 metadata=metadata or {},
                 output_format="v1.1",
                 infer=infer,
-                user_id=user_id
+                user_id=user_id,
             )
-        except Exception as exc: # noqa: BLE001
+        except Exception as exc:  # noqa: BLE001
             raise Mem0ConnectError(f"add_memory Failed: {exc}") from exc
-
 
     def search_metadata(self, metadata: str) -> List[Dict[str, Any]]:
         """
@@ -143,19 +140,8 @@ class Mem0Client:
         return self._client.search(
             query="*",
             version="v2",
-            filters={
-                "AND": [
-                    {
-                        "metadata": {
-                            "eq": {
-                                "id": f"{metadata}"
-                            }
-                        }
-                    }
-                ]
-            }
+            filters={"AND": [{"metadata": {"eq": {"id": f"{metadata}"}}}]},
         )
-
 
     def search(
         self,
@@ -178,12 +164,8 @@ class Mem0Client:
         List of memory records matching the query
         """
         try:
-            return self._client.search(
-                query,
-                user_id=user_id,
-                limit=limit
-            )
-        except Exception as exc: # noqa: BLE001
+            return self._client.search(query, user_id=user_id, limit=limit)
+        except Exception as exc:  # noqa: BLE001
             raise Mem0ConnectError(f"search failed: {exc}") from exc
 
     def delete_memory(self, memory_id: str) -> Dict[str, Any]:
@@ -219,7 +201,7 @@ class Mem0Client:
             self._client.delete_all(user_id=user_id)
         except Exception as exc:  # noqa: BLE001
             raise Mem0ConnectError(f"delete_user_memories failed: {exc}") from exc
-        
+
     def _health_check(self) -> None:
         """
         Write & immediately retrieve a dummy message to verify pipeline.
@@ -237,36 +219,46 @@ class Mem0Client:
             # If the response time exceeds 7.5 seconds, the access is considered a failure.
             for attempt in range(1, 6):
                 hits = self._client.search(
-                    query=MEM0_PING_CONTENT,
-                    user_id = "__health_check__",
-                    limit = 1
+                    query=MEM0_PING_CONTENT, user_id="__health_check__", limit=1
                 )
                 if hits:
                     return
                 sleep_for = 0.5 * attempt
                 time.sleep(sleep_for)
-            raise Mem0ConnectError("Mem0ConnectionError: When initialized. Unable to retrieve the data.")
-        except Exception as exc: # noqa: BLE001
-            raise Mem0ConnectError(f"Mem0ConnectionError: When initialized. error: {exc}.") from exc
+            raise Mem0ConnectError(
+                "Mem0ConnectionError: When initialized. Unable to retrieve the data."
+            )
+        except Exception as exc:  # noqa: BLE001
+            raise Mem0ConnectError(
+                f"Mem0ConnectionError: When initialized. error: {exc}."
+            ) from exc
         finally:
             try:
                 if mem_id:
                     self.delete_memory(mem_id)
                 self.delete_user_memories(user_id="__health_check__")
             except Exception:
-                raise Mem0ConnectError("Mem0ConnectionError: When initialized. Unable to delete written memory.")
-        
+                raise Mem0ConnectError(
+                    "Mem0ConnectionError: When initialized. Unable to delete written memory."
+                )
+
 
 if __name__ == "__main__":
     import os
-    
+
     api_key = os.getenv("MEM0_API_KEY")
-    
+
     def test_add_and_search():
         client = Mem0Client()  # 默认托管平台
-        client.add_memory("Graph-vector demo", user_id="__ci__", metadata={"Name": "Flower Dance",})
+        client.add_memory(
+            "Graph-vector demo",
+            user_id="__ci__",
+            metadata={
+                "Name": "Flower Dance",
+            },
+        )
         out = client.search("graph-vector", user_id="__ci__", limit=1)
         client.delete_user_memories(user_id="__ci__")
         print(out)
-    
+
     test_add_and_search()

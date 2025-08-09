@@ -4,7 +4,6 @@
 ===================================================
 """
 
-
 import os
 
 from dataclasses import dataclass
@@ -58,14 +57,14 @@ class DebugTerminalIO(IOStream):
         cache_root = Path(os.getenv("XDG_CACHE_HOME", Path.home() / ".cache"))
         target_dir = cache_root / "library-index" / "results"
         target_dir.mkdir(parents=True, exist_ok=True)
-        
+
         timestamp = datetime.now().strftime("%Y-%m-%d_%H%M%S")
         filepath = target_dir / f"{timestamp}.md"
-        
+
         # Append text to a file (UTF-8 encoding)
         with filepath.open("a", encoding="utf-8") as f:
             f.write(query)
             if not query.endswith("\n"):
                 f.write("\n")
-        
+
         return str(filepath)
