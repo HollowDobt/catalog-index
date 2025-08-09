@@ -212,7 +212,7 @@ class IntelligentResearchAgent:
         old_state = self.context.current_state
         self.context.current_state = new_state
 
-        # Prepare log data. If context_data is None, use {}
+        # Prepare log data. If context_data is None, use None
         transition_details = {
             "from_state": getattr(old_state, "name", None),
             "to_state": getattr(old_state, "name", None),
