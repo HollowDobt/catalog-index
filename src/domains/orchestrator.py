@@ -7,134 +7,17 @@
 # Advanced AI Agent with State Planning and Adaptive Execution
 """
 
-from dataclasses import dataclass, field
-from typing import List, Dict, Any, Optional, Tuple, Callable
+from typing import List, Dict, Any, Optional
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from infrastructure import *
 from domains import *
-from enum import Enum, auto
 
-import time
-import threading
 import queue
-import json
-import uuid
-import math
 import re
-from collections import defaultdict
-
-
-class AgentState(Enum):
-    """
-    Agent execution states
-    """
-
-    INITIALIZING = (
-        auto()
-    )  # Initialize the agent, load resources, and prepare the environment.
-    ANALYZING_QUERY = (
-        auto()
-    )  # Analyze the query or task entered by the user to understand the intent.
-    PLANNING_SEARCH = (
-        auto()
-    )  # Develop a search plan, such as selecting keywords, data sources, and API call methods.
-    EXECUTING_SEARCH = (
-        auto()
-    )  # Perform search operations (calling an API, querying a database, etc.).
-    PROCESSING_RESULTS = (
-        auto()
-    )  # Perform preliminary processing on search results (deduplication, screening, and structuring).
-    EVALUATING_RESULTS = (
-        auto()
-    )  # Evaluate the quality of the results and determine whether they meet the requirements.
-    REFINING_STRATEGY = (
-        auto()
-    )  # If the results are not satisfactory, adjust the strategy (change keywords, change data sources, etc.).
-    SYNTHESIZING = (
-        auto()
-    )  # Organize and integrate the final results into output content.
-    COMPLETED = auto()  # Mission accomplished.
-    ERROR = (
-        auto()
-    )  # An error occurred (such as network anomaly, data parsing failure, etc.).
-
-
-class ActionType(Enum):
-    """
-    Types of actions the agent can take
-    """
-
-    QUERY_ANALYSIS = auto()  # Parse the input query, identify intent, and split tasks.
-    KEYWORD_GENERATION = auto()  # Generate search keywords or query expressions.
-    SEARCH_EXECUTION = auto()  # Perform a search directly
-    RESULT_PROCESSING = auto()  # Parse, clean, and format the raw results.
-    STRATEGY_REFINEMENT = (
-        auto()
-    )  # Adjust search/processing strategies to achieve better results.
-    SYNTHESIS = auto()  # Synthesize the processed information into a final answer.
-
-
-@dataclass
-class ExecutionContext:
-    """
-    Context information for agent decisions
-    """
-
-    current_state: AgentState
-    search_attempts: int
-    total_papers_found: int
-    processed_papers: int
-    successful_analyses: int
-    failed_analyses: int
-    current_keywords: str
-    user_query: str
-    execution_history: List[Dict[str, Any]] = field(default_factory=list)
-    search_results: List[Dict[str, Any]] = field(default_factory=list)
-    analysis_results: List[str] = field(default_factory=list)
-
-    # Log component function
-    def add_execution_record(self, action: ActionType, details: Dict[str, Any]):
-        """
-        Record an execution step
-        """
-        self.execution_history.append(
-            {
-                "timestamp": time.time(),
-                "action": action.name,
-                "state": self.current_state.name,
-                "details": details,
-            }
-        )
-
-
-@dataclass
-class ArxivRateLimiter:
-    """
-    ArXiv API rate limiter - strictly adheres to official documentation requirements
-    """
-
-    min_interval: int
-    last_request_time = 0
-    lock = threading.Lock()
-
-    def wait_if_needed(self):
-        """
-        Ensure that the request interval >= 3 seconds
-        """
-        with self.lock:
-
-            current_time = time.time()
-            time_since_last = current_time - self.last_request_time
-
-            if time_since_last < self.min_interval:
-                sleep_time = self.min_interval - time_since_last
-                time.sleep(sleep_time)
-
-            self.last_request_time = time.time()
 
 
 # Global rate limiter
-arxiv_rate_limiter = ArxivRateLimiter(min_interval=3)
+arxiv_rate_limiter = RateLimiter(min_interval=3)
 
 
 class IntelligentResearchAgent:
@@ -1005,51 +888,3 @@ class IntelligentResearchAgent:
             self._transition_state(AgentState.ERROR)
             return f"执行异常: {exc}"
 
-
-def main(
-    interface: str,
-    raw_message_process_llm: str,
-    raw_message_process_llm_model: str,
-    api_generate_llm: str,
-    api_generate_llm_model: str,
-    embedding_llm: str,
-    embedding_llm_model: str,
-    max_workers_llm=8,
-    max_search_retries=3,
-) -> str:
-    """
-    Intelligent Research Agent - Advanced AI system with state-based planning
-
-    params
-    ------
-    interface: str - Interface type ("debug", etc.)
-    raw_message_process_llm: str - LLM provider for query processing
-    raw_message_process_llm_model: str - Model for query processing
-    api_generate_llm: str - LLM provider(RAG) for API generation
-    api_generate_llm_model: str - Model for API generation
-    embedding_llm: str - LLM provider for embedding and finding connections
-    embedding_llm_model: str - Model for embedding and finding connections
-    max_workers_llm: int - Maximum concurrent workers for LLM processing
-    max_search_retries: int - Maximum search retry attempts
-
-    return
-    ------
-    str - Final research results or execution summary
-    """
-
-    # Configuration for the intelligent agent
-    agent_config = {
-        "interface": interface,
-        "raw_message_process_llm": raw_message_process_llm,
-        "raw_message_process_llm_model": raw_message_process_llm_model,
-        "api_generate_llm": api_generate_llm,
-        "api_generate_llm_model": api_generate_llm_model,
-        "embedding_llm": embedding_llm,
-        "embedding_llm_model": embedding_llm_model,
-        "max_workers_llm": max_workers_llm,
-        "max_search_retries": max_search_retries,
-    }
-
-    # Create and execute the intelligent research agent
-    agent = IntelligentResearchAgent(agent_config)
-    return agent.execute()
