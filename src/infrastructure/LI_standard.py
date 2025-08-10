@@ -24,10 +24,10 @@ from __future__ import annotations
 from typing import Any, Dict, Type, TypeVar, Generic
 
 
-T = TypeVar("T", bound="RegistryMinimum")
+T = TypeVar("T", bound="LIStandard")
 
 
-class RegistryMinimum(Generic[T]):
+class LIStandard(Generic[T]):
     """
     Minimum implementing a name based registry and factory
     """
@@ -78,4 +78,4 @@ class RegistryMinimum(Generic[T]):
             )
         return subcls(**kwargs)
     
-__all__ = ["RegistryMinimum"]
+__all__ = ["LIStandard"]

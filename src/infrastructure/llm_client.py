@@ -7,62 +7,14 @@
 """
 
 from abc import ABC, abstractmethod
-from typing import Type, Dict, Any, List
+from typing import Dict, Any, List
+from infrastructure import LIStandard
 
 
-class LLMClient(ABC):
+class LLMClient(LIStandard, ABC):
     """
     Abstract large model tools class
     """
-
-    _registry: Dict[str, Type["LLMClient"]] = {}
-
-    ### Function used when instantiating the abstract base class
-    @classmethod
-    def register(cls, name: str):
-        """
-        Register an LLMClient subclass under a provider name.
-
-        params
-        ------
-        name: provider name used for registration
-
-        return
-        ------
-        Decorator that registers the subclass
-        """
-
-        def decorator(subcls: Type["LLMClient"]):
-            if name in cls._registry:
-                raise KeyError(
-                    f"LLMClient provider '{name}' cannot be registered again."
-                )
-            cls._registry[name] = subcls
-            return subcls
-
-        return decorator
-
-    @classmethod
-    def create(cls, provider_name: str, **kwargs: Any) -> "LLMClient":
-        """
-        Instantiate a registered LLMClient subclass by name.
-
-        params
-        ------
-        provider_name: name of the registered provider
-        **kwargs: parameters forwarded to the subclass constructor
-
-        return
-        ------
-        Instance of the specified LLMClient subclass
-        """
-        subcls = cls._registry.get(provider_name)
-        if subcls is None:
-            valid = ", ".join(cls._registry.keys())
-            raise ValueError(
-                f"Unknown LLMClient provider name '{provider_name}'. Available: {valid}"
-            )
-        return subcls(**kwargs)
 
     ### Required functions for subclasses
     @abstractmethod

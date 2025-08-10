@@ -7,63 +7,14 @@
 """
 
 from abc import ABC, abstractmethod
-from typing import Type, Dict, Any, List
+from typing import Dict, Any, List
+from infrastructure import LIStandard
 
-
-class AcademicDBClient(ABC):
+class AcademicDBClient(LIStandard, ABC):
     """
     Abstract ADB tools class
     """
-
-    _registry: Dict[str, Type["AcademicDBClient"]] = {}
-
-    ### Function used when instantiating the abstract base class
-    @classmethod
-    def register(cls, name: str):
-        """
-        Register an AcademicDBClient subclass under a provider name.
-
-        params
-        ------
-        name: provider name used for registration
-
-        return
-        ------
-        Decorator that registers the subclass
-        """
-
-        def decorator(subcls: Type["AcademicDBClient"]):
-            if name in cls._registry:
-                raise KeyError(
-                    f"AcademicDBClient provider '{name}' cannot be registered again."
-                )
-            cls._registry[name] = subcls
-            return subcls
-
-        return decorator
-
-    @classmethod
-    def create(cls, provider_name: str, **kwargs: Any) -> "AcademicDBClient":
-        """
-        Instantiate a registered AcademicDBClient subclass by name.
-
-        params
-        ------
-        provider_name: name of the registered provider
-        **kwargs: parameters forwarded to the subclass constructor
-
-        return
-        ------
-        Instance of the specified AcademicDBClient subclass
-        """
-        subcls = cls._registry.get(provider_name)
-        if subcls is None:
-            valid = ", ".join(cls._registry.keys())
-            raise ValueError(
-                f"Unknown AcademicDBClient provider name '{provider_name}'. Available: {valid}"
-            )
-        return subcls(**kwargs)
-
+    
     ### Required function for subclasses
     @abstractmethod
     def search_get_metadata(self, query: str, max_num: int) -> List[Dict[str, Any]]:
