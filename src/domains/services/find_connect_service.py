@@ -7,7 +7,7 @@ Find the relationship between user needs and existing literature
 """
 
 
-from infrastructure import LLMClient
+from src.infrastructure import LLMClient
 
 
 def find_connect(llm_embedding: LLMClient, article: str, user_query: str) -> str:

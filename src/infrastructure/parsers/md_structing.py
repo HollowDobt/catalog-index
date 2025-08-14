@@ -8,7 +8,7 @@ Parse markdown files into structured, tokenized content
 
 
 from typing import List
-from infrastructure.clients import LLMClient
+from src.infrastructure.clients import LLMClient
 import logging
 
 

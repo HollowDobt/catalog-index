@@ -10,8 +10,8 @@ Search results and relevance evaluator
 from typing import Dict, Any
 import logging
 
-from domains.entities.execution_context import ExecutionContext
-from config import CONFIG
+from src.domains.entities.execution_context import ExecutionContext
+from src.config import CONFIG
 
 
 logger = logging.getLogger(__name__)

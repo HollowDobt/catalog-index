@@ -15,7 +15,7 @@ import logging
 from typing import Dict, Optional, Any, List, Union
 from mem0 import MemoryClient
 
-from config import CONFIG
+from src.config import CONFIG
 
 
 logger = logging.getLogger(__name__)

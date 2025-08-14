@@ -8,8 +8,8 @@ Keyword Optimizer
 
 
 from typing import Dict, Any
-from domains.entities.execution_context import ExecutionContext
-from infrastructure import LLMClient
+from src.domains.entities.execution_context import ExecutionContext
+from src.infrastructure import LLMClient
 
 
 def summarize_execution_history(context: ExecutionContext) -> str:

@@ -20,7 +20,7 @@ from docling_core.types.doc.base import ImageRefMode
 from docling_core.types.doc.document import PictureItem
 import pymupdf4llm
 
-from config import CONFIG
+from src.config import CONFIG
 
 
 logger = logging.getLogger(__name__)

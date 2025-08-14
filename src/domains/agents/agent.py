@@ -12,7 +12,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 import queue
 import logging
 
-from infrastructure import (
+from src.infrastructure import (
     RateLimiter,
     LLMClient,
     AcademicDBAPIGenerator,
@@ -21,10 +21,10 @@ from infrastructure import (
     PDFToMarkdownConverter,
     ArticleStructuring
 )
-from config import CONFIG
-from domains.agents.agent_states import ActionType, AgentState
-from domains.entities import ExecutionContext
-from domains.services import (
+from src.config import CONFIG
+from src.domains.agents.agent_states import ActionType, AgentState
+from src.domains.entities import ExecutionContext
+from src.domains.services import (
     evaluate_search_quality,
     generate_adaptive_keywords,
     intelligent_synthesis_merge,

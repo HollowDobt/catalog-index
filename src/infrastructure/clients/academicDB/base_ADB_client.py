@@ -8,7 +8,7 @@ Scientific research database query component and API access code generator
 
 from abc import ABC, abstractmethod
 from typing import Dict, Any, List
-from infrastructure.base_registries import LIStandard
+from src.infrastructure.base_registries import LIStandard
 
 
 class AcademicDBClient(LIStandard, ABC):

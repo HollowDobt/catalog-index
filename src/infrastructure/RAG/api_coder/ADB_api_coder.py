@@ -9,7 +9,7 @@ ADB api code 生成器基类
 
 from abc import ABC, abstractmethod
 from typing import List
-from infrastructure.base_registries import LIStandard
+from src.infrastructure.base_registries import LIStandard
 
 
 class AcademicDBAPIGenerator(LIStandard, ABC):

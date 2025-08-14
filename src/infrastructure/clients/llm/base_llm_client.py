@@ -9,7 +9,7 @@ Large model client component base class
 
 from abc import ABC, abstractmethod
 from typing import Dict, Any, List
-from infrastructure.base_registries import LIStandard
+from src.infrastructure.base_registries import LIStandard
 
 
 class LLMClient(LIStandard, ABC):

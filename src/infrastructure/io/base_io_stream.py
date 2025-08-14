@@ -10,7 +10,7 @@ Input and output device base class
 from abc import ABC, abstractmethod
 from typing import Any, Dict, Optional
 from dataclasses import dataclass
-from infrastructure.base_registries import LIStandard
+from src.infrastructure.base_registries import LIStandard
 
 
 @dataclass

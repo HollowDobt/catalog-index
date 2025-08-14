@@ -14,8 +14,8 @@ from typing import Dict, List, Any, Optional
 from urllib.parse import urljoin
 import logging
 
-from infrastructure.clients.llm.base_llm_client import LLMClient
-from config import CONFIG
+from src.infrastructure.clients.llm.base_llm_client import LLMClient
+from src.config import CONFIG
 
 
 logger = logging.getLogger(__name__)

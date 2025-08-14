@@ -13,7 +13,7 @@ import ast
 import json
 import logging
 
-from infrastructure.RAG.api_coder.arxiv.arxiv_allowed_constants import *
+from src.infrastructure.RAG.api_coder.arxiv.arxiv_allowed_constants import *
 
 
 logger = logging.getLogger(__name__)

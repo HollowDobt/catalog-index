@@ -14,7 +14,7 @@ from datetime import datetime
 import logging
 import sys
 
-from domains import IntelligentResearchAgent, AgentState
+from src.domains import IntelligentResearchAgent, AgentState
 
 
 logger = logging.getLogger(__name__)

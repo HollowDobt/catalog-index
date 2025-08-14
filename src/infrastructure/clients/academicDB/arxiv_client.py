@@ -14,8 +14,8 @@ import requests
 from typing import List, Dict, Any, Optional
 from pathlib import Path
 
-from infrastructure.clients.academicDB.base_ADB_client import AcademicDBClient
-from config import CONFIG
+from src.infrastructure.clients.academicDB.base_ADB_client import AcademicDBClient
+from src.config import CONFIG
 
 
 logger = logging.getLogger(__name__)

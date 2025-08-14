@@ -8,7 +8,7 @@ Input and output devices on the local terminal
 
 
 from typing import Dict, Any
-from infrastructure.io.base_io_stream import IOStream, IOInStream, IOOutStream
+from src.infrastructure.io.base_io_stream import IOStream, IOInStream, IOOutStream
 
 
 @IOStream.register("terminal")

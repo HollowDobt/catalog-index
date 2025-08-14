@@ -10,7 +10,7 @@ and an AI return content extractor
 
 import logging
 import re
-from config import CONFIG
+from src.config import CONFIG
 
 
 logger = logging.getLogger(__name__)
