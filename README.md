@@ -1,8 +1,17 @@
-# Library Index Project
----
+# 智库索引(中文文档)
 
-## Introduction
+## 简介
 
-The Chinese name I chose for this project may mislead many people. It is called "智库索引". However, its only function is to automate scientific research literature queries, and has nothing to do with think tanks.
+这是一个致力于为科研检索提供帮助的 AI Agent. 其名**智库索引(Catalog Index)**灵感源自游戏[群星](https://zh.wikipedia.org/wiki/%E7%BE%A4%E6%98%9F_(%E6%B8%B8%E6%88%8F)中文明类型 Catalog Index 巧妙的中文翻译. 因此项目名中的"智库"实际上同中文语境下的智库无关, 智库索引实际上指代的是一个**喜欢知识, 并且善于整理归纳知识为索引的智能体**. 另外, 早期开发中为了区别 github 中常见的 **CI** 工作流, 智库索引在程序和文档中被简写为 **LI(Library Index)** 或者 **CIP(Catalog Index Project)**
 
-Currently, this project is still in the development stage. The idea is to use AI to decompose the general retrieval process into multiple steps, and then use AI to actively perform retrieval and analysis. This is a project that is more of a practice project, but because of the extremely strict requirements for scientific research, it is not easy in itself. In order to speed up the initial stage of development, this project temporarily uses mem0 as the cache memory layer. However, because mem0 does not support direct operation of the graph database at the beginning of the project, it may be gradually replaced by other memory layers later.
+目前, 这一项目仍处于开发阶段, 所有 Alpha 开头的 release 版本均为阶段验证版本. 截止到 2025 年 8 月 20 日, 这一检索智能体的开发规划如下
+
+- [x] 实现自动检索与文本分析简单工作流
+
+- [x] 实现自动检索与文本分析简单智能体
+
+- [ ] 实现基于 Abstract 优先的分析策略, 减少论文解析模式下的 tokens 消耗与运行耗时. 实现 mem0 精确检索与私有部署可靠的运维流程
+
+- [ ] 实现更优秀的解析策略, 将简单提示词策略改为更复杂的生成工具调用
+
+- [ ] 实现简单前端界面. 首先实现 TUI 和 WebUI
