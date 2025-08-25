@@ -28,7 +28,8 @@ from src.domains.services import (
     evaluate_search_quality,
     generate_adaptive_keywords,
     intelligent_synthesis_merge,
-    find_connect
+    find_connect,
+    evaluate_abstract_relevance
 )
 
 
@@ -341,12 +342,50 @@ class IntelligentResearchAgent:
             logger.warning("No metadata found")
             return AgentState.EVALUATING_RESULTS
         
+        # Filter papers by abstract relevance first
+        relevant_metadata: List[Dict[str, Any]] = []
+        filtered_count = 0
+        
+        for meta in self.all_metadata:
+            paper_id = meta.get("id", "unknown")
+            abstract = meta.get("summary", "")
+            
+            if not abstract.strip():
+                logger.warning(f"No abstract found for paper {paper_id}, skipping relevance check")
+                relevant_metadata.append(meta)
+                continue
+            
+            # Evaluate abstract relevance
+            try:
+                relevance_score = evaluate_abstract_relevance(
+                    llm_embedding=self.llm_embedding,
+                    abstract=abstract,
+                    user_query=self.context.user_query
+                )
+                
+                if relevance_score >= CONFIG["MINIMUM_RELEVANCE_THRESHOLD"]:
+                    relevant_metadata.append(meta)
+                    logger.info(f"Paper {paper_id} passed relevance filter (score: {relevance_score:.2f})")
+                else:
+                    filtered_count += 1
+                    logger.info(f"Paper {paper_id} filtered out (score: {relevance_score:.2f} < {CONFIG['MINIMUM_RELEVANCE_THRESHOLD']})")
+                    
+            except Exception as exc:
+                logger.warning(f"Error evaluating relevance for {paper_id}: {exc}, including paper anyway")
+                relevant_metadata.append(meta)
+        
+        logger.info(f"Abstract relevance filtering: {len(relevant_metadata)} papers passed, {filtered_count} filtered out")
+        
+        if not relevant_metadata:
+            logger.warning("No papers passed relevance filtering")
+            return AgentState.EVALUATING_RESULTS
+        
         with ThreadPoolExecutor(
             max_workers=CONFIG["MAX_WORKERS"], thread_name_prefix="LI-llm_worker"
         ) as executor:
             futures = []
 
-            for meta in self.all_metadata:
+            for meta in relevant_metadata:
                 logger.info(f"ヾ(●゜▽゜●)♡ Processing papers: {meta.get('id', 'unknown')}")
 
                 # Check memory first
@@ -354,9 +393,10 @@ class IntelligentResearchAgent:
                 if cached_analysis:
                     logger.info("✓ Get analysis results from the memory layer")
                     try:
-                        result = self.llm_embedding.find_connect(
+                        result = find_connect(
+                            llm_embedding=self.llm_embedding,
                             article=cached_analysis[0]["memory"],
-                            user_query=self.context.user_query,
+                            user_query=self.context.user_query
                         )
                         self.result_queue.put(result)
                         self.context.successful_analyses += 1
@@ -380,16 +420,19 @@ class IntelligentResearchAgent:
                 except Exception as exc:
                     logger.warning(f"Paper processing failed: {exc}")
 
-        self.context.processed_papers = len(self.all_metadata)
+        self.context.processed_papers = len(relevant_metadata)
 
         # Logging
         self.context.add_execution_record(
             action=ActionType.RESULT_PROCESSING,
             details={
+                "total_found": len(self.all_metadata),
+                "filtered_by_relevance": filtered_count,
                 "total_processed": self.context.processed_papers,
                 "successful": self.context.successful_analyses,
                 "failed": self.context.failed_analyses,
-                "summary": f"处理完成：{self.context.successful_analyses}/{self.context.processed_papers} 成功",
+                "relevance_threshold": CONFIG["MINIMUM_RELEVANCE_THRESHOLD"],
+                "summary": f"处理完成：通过相关性过滤 {len(relevant_metadata)}/{len(self.all_metadata)} 篇，成功分析 {self.context.successful_analyses}/{self.context.processed_papers} 篇",
             },
         )
 

@@ -49,4 +49,6 @@ CONSTANT_CONFIG: Dict[str, Any] = {
     "MIN_SEARCH_RESULTS": 3,
     # The upper limit of the number of search results in ADB 
     "ADB_SEARCH_MAX_RESULTS": 1,
+    # Abstract relevance filtering threshold (0.0-1.0, higher means stricter filtering)
+    "MINIMUM_RELEVANCE_THRESHOLD": 0.6,
 }
